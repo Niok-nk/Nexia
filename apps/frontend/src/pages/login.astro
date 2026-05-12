@@ -1,0 +1,98 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout showSidebar={false} title="Login">
+  <div class="login-page">
+    <div class="login-card">
+      <div class="login-logo">
+        <div class="icon">🤖</div>
+        <h1>CRM IA WhatsApp</h1>
+        <p>Ingresa tus credenciales para continuar</p>
+      </div>
+
+      <div id="login-error" class="login-error" style="display:none;"></div>
+
+      <form id="login-form">
+        <div class="form-group">
+          <label class="form-label" for="username">Usuario</label>
+          <input
+            class="form-input"
+            type="text"
+            id="username"
+            name="username"
+            placeholder="admin"
+            autocomplete="username"
+            required
+          />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="password">Contraseña</label>
+          <input
+            class="form-input"
+            type="password"
+            id="password"
+            name="password"
+            placeholder="••••••••"
+            autocomplete="current-password"
+            required
+          />
+        </div>
+        <button
+          type="submit"
+          id="login-btn"
+          class="btn btn-primary w-full"
+          style="justify-content:center; padding:0.75rem;"
+        >
+          Iniciar sesión
+        </button>
+      </form>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  const API = (import.meta as any).env?.PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+
+  // Si ya tiene token, ir al dashboard
+  if (localStorage.getItem('crm_token')) {
+    window.location.href = '/dashboard';
+  }
+
+  document.getElementById('login-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('login-btn') as HTMLButtonElement;
+    const errEl = document.getElementById('login-error') as HTMLDivElement;
+
+    const username = (document.getElementById('username') as HTMLInputElement).value;
+    const password = (document.getElementById('password') as HTMLInputElement).value;
+
+    btn.textContent = 'Iniciando sesión...';
+    btn.disabled = true;
+    errEl.style.display = 'none';
+
+    try {
+      const res = await fetch(`${API}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        errEl.textContent = data.error || 'Error al iniciar sesión';
+        errEl.style.display = 'block';
+      } else {
+        localStorage.setItem('crm_token', data.token);
+        localStorage.setItem('crm_user', data.username);
+        window.location.href = '/dashboard';
+      }
+    } catch {
+      errEl.textContent = 'No se pudo conectar al servidor. Verifica que el backend esté corriendo.';
+      errEl.style.display = 'block';
+    } finally {
+      btn.textContent = 'Iniciar sesión';
+      btn.disabled = false;
+    }
+  });
+</script>

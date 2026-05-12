@@ -35,10 +35,10 @@ cd 2026-05-11_chat_ia_whatsaap
 ```bash
 cd apps/backend
 npm install
-cp .env.example .env
-# Editar .env con tus credenciales
+# Puedes basarte en el .env.example o el .env ya configurado
 npm run prisma:generate
-npm run prisma:migrate
+# Crea/Actualiza la base de datos local SQLite
+npx prisma db push # O prisma migrate dev si usas migraciones
 npm run dev
 ```
 
@@ -52,7 +52,8 @@ npm install
 npm run dev
 ```
 
-El frontend se ejecutará en `http://localhost:4321`
+El frontend se ejecutará en `http://localhost:4322` (o 4321). 
+Abre esta URL en tu navegador e inicia sesión con las credenciales configuradas en el `.env` del backend (por defecto: usuario `admin`, contraseña `admin1234`).
 
 ## Variables de Entorno
 
@@ -124,10 +125,11 @@ docker-compose -f docker-compose.prod.yml up
 - [x] Schema de Prisma
 - [x] Endpoints CRUD básicos
 - [x] Agentes IA con Gemini
-- [ ] WhatsApp Web.js integrado
-- [ ] Frontend Astro Dashboard
-- [ ] JWT RS256 completo
-- [ ] Rate limiting y seguridad
+- [x] WhatsApp Web.js integrado
+- [x] Frontend Astro Dashboard (con Kanban, estadísticas y mensajería)
+- [x] Autenticación JWT y middleware
+- [x] Rate limiting y seguridad base
+- [ ] JWT RS256 completo para producción
 - [ ] CI/CD
 
 ## Licencia

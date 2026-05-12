@@ -1,8 +1,4 @@
 ---
-import WhatsAppUI from '../components/WhatsAppUI.astro';
-import Layout from '../layouts/Layout.astro';
+// Redirect root to /dashboard (Layout auth guard handles unauthenticated users)
+return Astro.redirect('/dashboard');
 ---
-
-<Layout>
-	<WhatsAppUI />
-</Layout>

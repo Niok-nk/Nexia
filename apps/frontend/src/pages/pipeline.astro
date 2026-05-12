@@ -1,0 +1,76 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout title="Pipeline" subtitle="Leads por etapa del proceso de venta">
+  <div class="kanban-board" id="kanban-board">
+    <div class="text-muted animate-pulse" style="padding:2rem;">Cargando pipeline...</div>
+  </div>
+</Layout>
+
+<script>
+  const API = 'http://localhost:8000/api/v1';
+  const token = localStorage.getItem('crm_token') || '';
+  const headers = { Authorization: `Bearer ${token}` };
+
+  const STAGES = [
+    { key: 'INITIAL',     label: 'Nuevos',       color: 'var(--stage-initial)' },
+    { key: 'QUALIFIED',   label: 'Calificados',   color: 'var(--stage-qualified)' },
+    { key: 'PROPOSAL',    label: 'Propuesta',     color: 'var(--stage-proposal)' },
+    { key: 'NEGOTIATION', label: 'Negociación',   color: 'var(--stage-negotiation)' },
+    { key: 'WON',         label: '✅ Ganados',    color: 'var(--stage-won)' },
+    { key: 'LOST',        label: '❌ Perdidos',   color: 'var(--stage-lost)' },
+    { key: 'ON_HOLD',     label: '⏸ En espera',  color: 'var(--stage-on-hold)' },
+  ];
+
+  function fmtPhone(p: string) {
+    return p?.slice(-10) || '—';
+  }
+  function timeAgo(dateStr: string) {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 60) return `hace ${m}m`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `hace ${h}h`;
+    return `hace ${Math.floor(h/24)}d`;
+  }
+
+  async function loadPipeline() {
+    try {
+      const res = await fetch(`${API}/leads`, { headers });
+      const leads = await res.json();
+      const board = document.getElementById('kanban-board')!;
+
+      board.innerHTML = STAGES.map(stage => {
+        const stageleads = leads.filter((l: any) => l.stage === stage.key);
+        return `
+          <div class="kanban-col">
+            <div class="kanban-col-header">
+              <span class="kanban-col-title" style="color:${stage.color};">${stage.label}</span>
+              <span class="kanban-count">${stageleads.length}</span>
+            </div>
+            <div class="kanban-cards">
+              ${stageleads.length ? stageleads.map((l: any) => `
+                <a href="/contacts/${l.contactId}" style="text-decoration:none;">
+                  <div class="kanban-card">
+                    <div class="kanban-card-name">${l.contact?.name || 'Sin nombre'}</div>
+                    <div class="kanban-card-phone">${fmtPhone(l.contact?.phone)}</div>
+                    <div class="kanban-card-footer">
+                      <span class="badge badge-${l.module}" style="font-size:0.65rem;">${l.module?.replace(/_/g,' ')}</span>
+                      <span class="text-muted text-xs">${timeAgo(l.updatedAt)}</span>
+                    </div>
+                    ${l.notes?.length ? `<div style="margin-top:0.4rem;font-size:0.7rem;color:var(--color-text-muted);">📝 ${l.notes.length} nota${l.notes.length > 1 ? 's' : ''}</div>` : ''}
+                  </div>
+                </a>`).join('')
+              : `<div class="text-muted text-xs" style="padding:0.75rem;text-align:center;">Sin leads</div>`}
+            </div>
+          </div>`;
+      }).join('');
+    } catch (err) {
+      console.error('Pipeline error:', err);
+      document.getElementById('kanban-board')!.innerHTML =
+        '<div class="text-muted" style="padding:2rem;">Error cargando el pipeline. ¿Está el backend corriendo?</div>';
+    }
+  }
+
+  loadPipeline();
+</script>

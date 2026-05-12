@@ -1,0 +1,91 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+<Layout title="Contactos" subtitle="Todos los contactos del CRM">
+  <fragment slot="header-actions">
+    <div style="display:flex;gap:0.75rem;align-items:center;">
+      <input
+        type="search"
+        id="search-input"
+        placeholder="🔍 Buscar por nombre o teléfono..."
+        style="width:280px;"
+      />
+    </div>
+  </fragment>
+
+  <div class="table-wrap" id="contacts-table-wrap">
+    <div class="text-muted animate-pulse" style="padding:2rem;">Cargando contactos...</div>
+  </div>
+</Layout>
+
+<script>
+  const API = 'http://localhost:8000/api/v1';
+  const token = localStorage.getItem('crm_token') || '';
+  const headers = { Authorization: `Bearer ${token}` };
+
+  let allContacts: any[] = [];
+
+  function fmtDate(d: string) {
+    return new Date(d).toLocaleDateString('es-CO', { year:'numeric', month:'short', day:'numeric' });
+  }
+  function fmtPhone(p: string) {
+    return p || '—';
+  }
+
+  function renderTable(contacts: any[]) {
+    const wrap = document.getElementById('contacts-table-wrap')!;
+    if (!contacts.length) {
+      wrap.innerHTML = '<div class="text-muted" style="padding:2rem;text-align:center;">No se encontraron contactos.</div>';
+      return;
+    }
+    wrap.innerHTML = `
+      <table>
+        <thead><tr>
+          <th>Nombre</th><th>Teléfono</th><th>Leads</th><th>Módulo</th><th>Etapa</th><th>Registro</th><th></th>
+        </tr></thead>
+        <tbody>
+          ${contacts.map(c => {
+            const lastLead = c.leads?.slice(-1)[0];
+            return `<tr>
+              <td>
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                  <div style="width:32px;height:32px;border-radius:50%;background:var(--color-wa-glow);display:flex;align-items:center;justify-content:center;flex-shrink:0;">👤</div>
+                  <div>
+                    <div style="font-weight:600;">${c.name || 'Sin nombre'}</div>
+                    ${c.email ? `<div class="text-muted text-xs">${c.email}</div>` : ''}
+                  </div>
+                </div>
+              </td>
+              <td class="font-mono text-xs">${fmtPhone(c.phone)}</td>
+              <td style="text-align:center;">${c.leads?.length || 0}</td>
+              <td>${lastLead ? `<span class="badge badge-${lastLead.module}">${lastLead.module?.replace(/_/g,' ')}</span>` : '<span class="text-muted text-xs">—</span>'}</td>
+              <td>${lastLead ? `<span class="badge badge-${lastLead.stage}">${lastLead.stage}</span>` : '<span class="text-muted text-xs">—</span>'}</td>
+              <td class="text-muted text-xs">${fmtDate(c.createdAt)}</td>
+              <td><a href="/contacts/${c.id}" class="btn btn-ghost" style="padding:0.25rem 0.75rem;font-size:0.75rem;">Ver →</a></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  async function loadContacts() {
+    try {
+      const res = await fetch(`${API}/contacts`, { headers });
+      allContacts = await res.json();
+      renderTable(allContacts);
+    } catch {
+      document.getElementById('contacts-table-wrap')!.innerHTML =
+        '<div class="text-muted" style="padding:2rem;">Error cargando contactos.</div>';
+    }
+  }
+
+  document.getElementById('search-input')?.addEventListener('input', (e) => {
+    const q = (e.target as HTMLInputElement).value.toLowerCase();
+    const filtered = allContacts.filter(c =>
+      (c.name || '').toLowerCase().includes(q) || c.phone.includes(q)
+    );
+    renderTable(filtered);
+  });
+
+  loadContacts();
+</script>

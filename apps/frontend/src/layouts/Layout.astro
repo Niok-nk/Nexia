@@ -1,25 +1,128 @@
 ---
-import '../styles/index.css';
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  subtitle?: string;
+  showSidebar?: boolean;
+}
+const { title = 'CRM Dashboard', subtitle, showSidebar = true } = Astro.props;
+const API = import.meta.env.PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const currentPath = Astro.url.pathname;
+
+const navItems = [
+  { href: '/dashboard',  icon: '📊', label: 'Dashboard'   },
+  { href: '/pipeline',   icon: '🗂️', label: 'Pipeline'    },
+  { href: '/contacts',   icon: '👥', label: 'Contactos'   },
+  { href: '/whatsapp',   icon: '💬', label: 'WhatsApp'    },
+];
 ---
 <!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="generator" content={Astro.generator} />
-		<title>WhatsApp CRM</title>
-	</head>
-	<body>
-		<slot />
-	</body>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="CRM Dashboard — Chatbot IA + WhatsApp" />
+  <title>{title} · CRM IA</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>" />
+</head>
+<body>
+{showSidebar ? (
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-icon">🤖</div>
+        <div>
+          <div class="logo-text">CRM IA</div>
+          <div class="logo-sub">WhatsApp Bot</div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-section-label">Principal</div>
+          {navItems.map(item => (
+            <a
+              href={item.href}
+              class={`nav-link ${currentPath === item.href ? 'active' : ''}`}
+            >
+              <span class="nav-icon">{item.icon}</span>
+              {item.label}
+            </a>
+          ))}
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="wa-status-badge" id="wa-status-badge">
+          <div class="wa-dot" id="wa-dot"></div>
+          <span id="wa-status-text">Verificando...</span>
+        </div>
+        <div style="margin-top:0.75rem;">
+          <button
+            onclick="logout()"
+            class="btn btn-ghost w-full"
+            style="font-size:0.75rem; justify-content:center; padding:0.4rem;"
+          >
+            🚪 Cerrar sesión
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <div class="main-content">
+      {(title || subtitle) && (
+        <header class="page-header">
+          <div>
+            <div class="page-title">{title}</div>
+            {subtitle && <div class="page-subtitle">{subtitle}</div>}
+          </div>
+          <slot name="header-actions" />
+        </header>
+      )}
+      <main class="page-body animate-fade-in">
+        <slot />
+      </main>
+    </div>
+  </div>
+) : (
+  <slot />
+)}
+
+<script define:vars={{ API }}>
+  // Auth guard
+  const token = localStorage.getItem('crm_token');
+  if (!token && !window.location.pathname.includes('/login')) {
+    window.location.href = '/login';
+  }
+
+  // WA status polling
+  async function updateWAStatus() {
+    const dot = document.getElementById('wa-dot');
+    const txt = document.getElementById('wa-status-text');
+    if (!dot || !txt) return;
+    try {
+      const res = await fetch(`${API}/whatsapp/status`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) return;
+      const { status } = await res.json();
+      dot.className = `wa-dot ${status}`;
+      const labels = { connected: '✅ Conectado', qr_pending: '🔄 Escaneando QR', disconnected: '❌ Desconectado' };
+      txt.textContent = labels[status] || status;
+    } catch {}
+  }
+
+  updateWAStatus();
+  setInterval(updateWAStatus, 10000);
+
+  function logout() {
+    localStorage.removeItem('crm_token');
+    window.location.href = '/login';
+  }
+  window.logout = logout;
+</script>
+</body>
 </html>
-<style>
-	html,
-	body {
-		margin: 0;
-		width: 100%;
-		height: 100%;
-	}
-</style>
