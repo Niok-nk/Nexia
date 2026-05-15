@@ -52,7 +52,7 @@ const { id } = Astro.params;
   }
 
   async function loadContact() {
-    const container = document.getElementById('contact-detail')!;
+    const container = document.getElementById('contact-detail');
     try {
       const res = await fetch(`${API}/contacts/${contactId}`, { headers });
       if (!res.ok) { container.innerHTML = '<div class="text-muted">Contacto no encontrado.</div>'; return; }
