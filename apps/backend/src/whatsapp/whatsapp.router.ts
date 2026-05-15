@@ -7,7 +7,7 @@ import prisma from '../db/index.js';
 import { orchestrator } from '../agents/orchestrator.js';
 import logger from '../utils/logger.js';
 
-const router = Router();
+const router: Router = Router();
 
 // GET /api/v1/whatsapp/status
 router.get('/status', requireAuth, (_req: Request, res: Response) => {

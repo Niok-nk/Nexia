@@ -5,7 +5,7 @@ import { whatsappRouter } from '../whatsapp/whatsapp.router.js';
 import { productsRouter } from '../woocommerce/products.router.js';
 import { authRouter } from '../auth/auth.router.js';
 
-const router = Router();
+const router: Router = Router();
 
 router.use('/auth', authRouter);
 router.use('/contacts', contactsRouter);

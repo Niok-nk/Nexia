@@ -18,11 +18,11 @@ const { id } = Astro.params;
   const token = localStorage.getItem('crm_token') || '';
   const headers = { Authorization: `Bearer ${token}` };
 
-  function fmtTime(d: string) {
+  function fmtTime(d) {
     return new Date(d).toLocaleString('es-CO', { hour:'2-digit', minute:'2-digit', day:'2-digit', month:'short' });
   }
-  function stageLabel(s: string) {
-    const m: Record<string,string> = {
+  function stageLabel(s) {
+    const m = {
       INITIAL:'Nuevo', QUALIFIED:'Calificado', PROPOSAL:'Propuesta',
       NEGOTIATION:'Negociación', WON:'Ganado', LOST:'Perdido', ON_HOLD:'En espera',
     };
@@ -31,7 +31,7 @@ const { id } = Astro.params;
 
   const STAGE_OPTIONS = ['INITIAL','QUALIFIED','PROPOSAL','NEGOTIATION','WON','LOST','ON_HOLD'];
 
-  async function changeStage(leadId: string, stage: string) {
+  async function changeStage(leadId, stage) {
     await fetch(`${API}/leads/${leadId}/stage`, {
       method: 'PATCH',
       headers: { ...headers, 'Content-Type': 'application/json' },
@@ -40,7 +40,7 @@ const { id } = Astro.params;
     loadContact();
   }
 
-  async function addNote(leadId: string) {
+  async function addNote(leadId) {
     const body = prompt('Escribe la nota interna:');
     if (!body?.trim()) return;
     await fetch(`${API}/leads/${leadId}/notes`, {
@@ -58,7 +58,7 @@ const { id } = Astro.params;
       if (!res.ok) { container.innerHTML = '<div class="text-muted">Contacto no encontrado.</div>'; return; }
       const c = await res.json();
       const lead = c.leads?.slice(-1)[0];
-      const messages: any[] = c.messages?.sort((a: any, b: any) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime()) || [];
+      const messages = c.messages?.sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime()) || [];
 
       container.innerHTML = `
         <div style="display:grid;grid-template-columns:340px 1fr;gap:1.5rem;align-items:start;">
@@ -93,7 +93,7 @@ const { id } = Astro.params;
               ${lead.notes?.length ? `
               <div style="margin-top:1rem;">
                 <div class="text-xs text-muted mb-4">Notas (${lead.notes.length})</div>
-                ${lead.notes.map((n: any) => `
+                ${lead.notes.map((n) => `
                   <div style="background:var(--color-bg-hover);border-radius:var(--radius-md);padding:0.5rem 0.75rem;margin-top:0.4rem;font-size:0.8rem;">
                     <div>${n.body}</div>
                     <div class="text-muted text-xs">${fmtTime(n.createdAt)}</div>
@@ -108,7 +108,7 @@ const { id } = Astro.params;
               Historial de mensajes (${messages.length})
             </div>
             <div class="msg-list" style="max-height:600px;overflow-y:auto;">
-              ${messages.length ? messages.map((m: any) => `
+              ${messages.length ? messages.map((m) => `
                 <div>
                   <div class="msg-bubble ${m.direction === 'INBOUND' ? 'inbound' : 'outbound'}">
                     ${m.body}
@@ -125,7 +125,7 @@ const { id } = Astro.params;
       // Stage change handler
       if (lead) {
         document.getElementById('stage-select')?.addEventListener('change', (e) => {
-          changeStage(lead.id, (e.target as HTMLSelectElement).value);
+          changeStage(lead.id, e.target.value);
         });
       }
 

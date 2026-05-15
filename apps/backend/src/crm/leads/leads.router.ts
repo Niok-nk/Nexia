@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../../db/index.js';
 
-const router = Router();
+const router: Router = Router();
 
 router.get('/' as any, async (_req: Request, res: Response) => {
 	try {

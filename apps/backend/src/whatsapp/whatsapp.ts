@@ -1,6 +1,7 @@
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client: WAClient, LocalAuth } = require('whatsapp-web.js');
+import type { Client } from 'whatsapp-web.js';
 import qrcode from 'qrcode';
 import logger from '../utils/logger.js';
 import { handleIncomingMessage } from './message.handler.js';
@@ -27,7 +28,7 @@ export const initWhatsApp = async (): Promise<Client | null> => {
 
 		logger.info({ chromePath }, 'Initializing WhatsApp with Chrome');
 
-		const client = new Client({
+		const client = new WAClient({
 			authStrategy: new LocalAuth({
 				dataPath: './wa_session',
 				clientId: 'nexia-crm-client',
@@ -50,7 +51,7 @@ export const initWhatsApp = async (): Promise<Client | null> => {
 			},
 		});
 
-		client.on('qr', async (qr) => {
+		client.on('qr', async (qr: string) => {
 			logger.info('QR Code received. Scan with WhatsApp.');
 			currentQR = qr;
 			isReady = false;
@@ -72,12 +73,12 @@ export const initWhatsApp = async (): Promise<Client | null> => {
 			currentQR = null;
 		});
 
-		client.on('auth_failure', (msg) => {
+		client.on('auth_failure', (msg: any) => {
 			logger.error({ msg }, 'WhatsApp authentication failed');
 			isReady = false;
 		});
 
-		client.on('disconnected', (reason) => {
+		client.on('disconnected', (reason: any) => {
 			logger.warn({ reason }, 'WhatsApp disconnected');
 			isReady = false;
 			currentQR = null;

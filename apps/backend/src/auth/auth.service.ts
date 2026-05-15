@@ -1,7 +1,6 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import fs from 'fs';
-import path from 'path';
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';

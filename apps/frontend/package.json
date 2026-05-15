@@ -13,5 +13,8 @@
   },
   "dependencies": {
     "astro": "^6.3.1"
+  },
+  "devDependencies": {
+    "vite": "^8.0.12"
   }
 }

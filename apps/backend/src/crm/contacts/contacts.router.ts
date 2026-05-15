@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import prisma from '../../db/index.js';
 import { z } from 'zod';
 
-const router = Router();
+const router: Router = Router();
 
 router.get('/' as any, async (_req: Request, res: Response) => {
 	try {
@@ -27,6 +27,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 		if (!contact) {
 			return res.status(404).json({ error: 'Contact not found' });
 		}
+		res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
 		res.json(contact);
 		return;
 	} catch (error) {

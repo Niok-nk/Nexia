@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import axios from 'axios';
 
-const router = Router();
+const router: Router = Router();
 
 const WC_BASE_URL = process.env.WC_BASE_URL || '';
 const WC_CONSUMER_KEY = process.env.WC_CONSUMER_KEY || '';

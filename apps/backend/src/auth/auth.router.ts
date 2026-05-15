@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { authService } from './auth.service.js';
 
-const router = Router();
+const router: Router = Router();
 
 const loginSchema = z.object({
 	username: z.string().min(1),

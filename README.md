@@ -34,12 +34,12 @@ cd 2026-05-11_chat_ia_whatsaap
 
 ```bash
 cd apps/backend
-npm install
+pnpm install
 # Puedes basarte en el .env.example o el .env ya configurado
-npm run prisma:generate
+pnpm run prisma:generate
 # Crea/Actualiza la base de datos local SQLite
-npx prisma db push # O prisma migrate dev si usas migraciones
-npm run dev
+pnpx prisma db push # O prisma migrate dev si usas migraciones
+pnpm run dev
 ```
 
 El backend se ejecutará en `http://localhost:8000`

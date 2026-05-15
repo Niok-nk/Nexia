@@ -23,16 +23,16 @@ import Layout from '../../layouts/Layout.astro';
   const token = localStorage.getItem('crm_token') || '';
   const headers = { Authorization: `Bearer ${token}` };
 
-  let allContacts: any[] = [];
+  let allContacts = [];
 
-  function fmtDate(d: string) {
+  function fmtDate(d) {
     return new Date(d).toLocaleDateString('es-CO', { year:'numeric', month:'short', day:'numeric' });
   }
-  function fmtPhone(p: string) {
+  function fmtPhone(p) {
     return p || '—';
   }
 
-  function renderTable(contacts: any[]) {
+  function renderTable(contacts) {
     const wrap = document.getElementById('contacts-table-wrap')!;
     if (!contacts.length) {
       wrap.innerHTML = '<div class="text-muted" style="padding:2rem;text-align:center;">No se encontraron contactos.</div>';

@@ -37,22 +37,22 @@ PORT=8000
 
 ```bash
 # Instalar dependencias
-npm install
+pnpm install
 
 # Generar Prisma client
-npm run prisma:generate
+pnpm run prisma:generate
 
 # Iniciar base de datos
-npm run prisma:migrate
+pnpm run prisma:migrate
 
 # Modo desarrollo (con hot-reload)
-npm run dev
+pnpm run dev
 
 # Build de producción
-npm run build
+pnpm run build
 
 # Iniciar en producción
-npm start
+pnpm start
 ```
 
 ## Endpoints API
