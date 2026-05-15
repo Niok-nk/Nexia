@@ -142,6 +142,10 @@ router.post('/chat', async (req: Request, res: Response) => {
 			},
 		});
 
+		if (getStatus() === 'connected') {
+			await sendMessage(phone, response);
+		}
+
 		res.json({ success: true, message: response, agentType });
 	} catch (error) {
 		logger.error({ error, phone, message }, 'Chat error');

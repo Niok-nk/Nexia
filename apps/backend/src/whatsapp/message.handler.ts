@@ -1,7 +1,7 @@
 import { Message } from 'whatsapp-web.js';
 import prisma from '../db/index.js';
 import { orchestrator } from '../agents/orchestrator.js';
-import { sendMessage } from './whatsapp.js';
+import { sendMessage, getStatus } from './whatsapp.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -113,21 +113,26 @@ export async function handleIncomingMessage(msg: Message): Promise<void> {
 			});
 		}
 
-		// 8. Enviar respuesta por WhatsApp
-		await sendMessage(phone, response);
-
-		logger.info({ phone, agentType, leadId: lead.id }, 'Response sent');
+		// 8. Enviar respuesta por WhatsApp solo si está conectado
+		if (getStatus() === 'connected') {
+			await sendMessage(phone, response);
+			logger.info({ phone, agentType, leadId: lead.id }, 'Response sent');
+		} else {
+			logger.warn({ phone, agentType }, 'WhatsApp not connected, response not sent');
+		}
 	} catch (error) {
 		logger.error({ error, phone }, 'Error handling incoming message');
 
-		// Intentar enviar mensaje de error al usuario
-		try {
-			await sendMessage(
-				phone,
-				'Lo siento, hubo un problema procesando tu mensaje. Por favor intenta de nuevo en un momento.'
-			);
-		} catch {
-			// Si falla el envío del error, solo logueamos
+		// Intentar enviar mensaje de error al usuario solo si está conectado
+		if (getStatus() === 'connected') {
+			try {
+				await sendMessage(
+					phone,
+					'Lo siento, hubo un problema procesando tu mensaje. Por favor intenta de nuevo en un momento.'
+				);
+			} catch {
+				// Si falla el envío del error, solo logueamos
+			}
 		}
 	}
 }
