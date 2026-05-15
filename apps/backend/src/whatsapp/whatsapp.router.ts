@@ -142,8 +142,15 @@ router.post('/chat', async (req: Request, res: Response) => {
 			},
 		});
 
-		if (getStatus() === 'connected') {
-			await sendMessage(phone, response);
+		const waStatus = getStatus();
+		logger.info({ waStatus, phone }, 'WhatsApp send check');
+		if (waStatus === 'connected') {
+			try {
+				await sendMessage(phone, response);
+				logger.info({ phone }, 'Message sent via WhatsApp');
+			} catch (err) {
+				logger.error({ error: err, phone }, 'Failed to send WhatsApp message');
+			}
 		}
 
 		res.json({ success: true, message: response, agentType });
@@ -240,8 +247,14 @@ router.post('/test', requireAuth, async (req: Request, res: Response) => {
 			});
 		}
 
-		// Enviar respuesta por WhatsApp
-		await sendMessage(phone, response);
+		// Enviar respuesta por WhatsApp solo si está conectado
+		if (getStatus() === 'connected') {
+			try {
+				await sendMessage(phone, response);
+			} catch (err) {
+				logger.error({ error: err, phone }, 'Failed to send WhatsApp message');
+			}
+		}
 
 		res.json({
 			success: true,
