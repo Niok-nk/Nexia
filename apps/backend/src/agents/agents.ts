@@ -50,6 +50,7 @@ REGLAS:
 - Termina con una llamada a la acción clara.
 - Responde SIEMPRE en español.
 - Máximo 200 palabras por respuesta.
+- NO muestres tu razonamiento interno, pasos de pensamiento, ni ningún texto entre asteriscos o guiones bajos. Solo responde directamente al cliente.
 
 CATÁLOGO DISPONIBLE:
 ${productList}`;
@@ -81,8 +82,9 @@ REGLAS:
 - Informa las opciones de pago disponibles: efectivo, transferencia, PSE, datacrédito.
 - Si el cliente tiene dificultades de pago, ofrece una reestructuración.
 - Siempre registra el compromiso de pago del cliente.
-- No amenaces ni uses lenguaje hostil.
-- Responde SIEMPRE en español. Máximo 150 palabras.`;
+- No amenaces ni usa lenguaje hostil.
+- Responde SIEMPRE en español. Máximo 150 palabras.
+- NO muestres tu razonamiento interno. Solo responde directamente al cliente.`;
 
 		const response = await generateResponse(
 			`HISTORIAL:\n${formatHistory(context?.history)}\n\nMENSAJE: ${message}`,
@@ -112,7 +114,8 @@ REGLAS:
 - Informa el costo aproximado del diagnóstico.
 - Si es urgente, indica el número de WhatsApp del taller.
 - Crea una nota con los síntomas reportados.
-- Responde SIEMPRE en español. Máximo 200 palabras.`;
+- Responde SIEMPRE en español. Máximo 200 palabras.
+- NO muestres tu razonamiento interno. Solo responde directamente al cliente.`;
 
 		const response = await generateResponse(
 			`HISTORIAL:\n${formatHistory(context?.history)}\n\nMENSAJE: ${message}`,
@@ -152,6 +155,7 @@ REGLAS:
 - Si no hay stock, indica tiempo de pedido (3-5 días hábiles).
 - Ofrece domicilio o retiro en tienda.
 - Responde SIEMPRE en español. Máximo 150 palabras.
+- NO muestres tu razonamiento interno. Solo responde directamente al cliente.
 ${productInfo}`;
 
 		const response = await generateResponse(
@@ -185,7 +189,8 @@ REGLAS:
 - Describe la vacante con beneficios y requisitos.
 - Solicita: nombre, cargo de interés y cómo enviar el CV (correo o por este chat).
 - Sé entusiasta con los beneficios de trabajar en la empresa.
-- Responde SIEMPRE en español. Máximo 200 palabras.`;
+- Responde SIEMPRE en español. Máximo 200 palabras.
+- NO muestres tu razonamiento interno. Solo responde directamente al cliente.`;
 
 		const response = await generateResponse(
 			`HISTORIAL:\n${formatHistory(context?.history)}\n\nMENSAJE: ${message}`,
@@ -218,7 +223,8 @@ REGLAS:
 - Solicita: nombre, ciudad, local comercial (sí/no), capital disponible.
 - Explica los beneficios del programa de distribuidores.
 - Agenda una llamada con el gerente comercial.
-- Responde SIEMPRE en español. Máximo 200 palabras.`;
+- Responde SIEMPRE en español. Máximo 200 palabras.
+- NO muestres tu razonamiento interno. Solo responde directamente al cliente.`;
 
 		const response = await generateResponse(
 			`HISTORIAL:\n${formatHistory(context?.history)}\n\nMENSAJE: ${message}`,
@@ -253,7 +259,8 @@ REGLAS:
 - Proporciona el medio de pago más conveniente para el cliente.
 - Confirma una vez realice el pago (número de confirmación).
 - Informa horario de acreditación (transferencias: 24-48h hábiles).
-- Responde SIEMPRE en español. Máximo 150 palabras.`;
+- Responde SIEMPRE en español. Máximo 150 palabras.
+- NO muestres tu razonamiento interno. Solo responde directamente al cliente.`;
 
 		const response = await generateResponse(
 			`HISTORIAL:\n${formatHistory(context?.history)}\n\nMENSAJE: ${message}`,

@@ -128,6 +128,14 @@ router.post('/chat', async (req: Request, res: Response) => {
 		await prisma.message.create({
 			data: {
 				contactId: contact.id,
+				direction: 'INBOUND',
+				body: message,
+			},
+		});
+
+		await prisma.message.create({
+			data: {
+				contactId: contact.id,
 				direction: 'OUTBOUND',
 				body: response,
 				agentType,
