@@ -23,6 +23,27 @@ function formatHistory(history: Array<{ direction: string; body: string }>): str
 		.join('\n');
 }
 
+// ─── Helper para limpiar respuesta de razonamiento interno ─────────────────
+function cleanResponse(response: string): string {
+	// Eliminar patrones de pensamiento como: * texto * , ** texto ** , _texto_
+	let cleaned = response
+		.replace(/\*[^*]+\*/g, '') // elimina *pensamiento*
+		.replace(/\*\*[^*]+\*\*/g, '') // elimina **pensamiento**
+		.replace(/_[^_]+_/g, '') // elimina _texto_
+		.replace(/^\s*[-•]\s*/gm, '') // elimina listas de pensamiento
+		.replace(/^Customer Input:.*$/gm, '')
+		.replace(/^Context\/History:.*$/gm, '')
+		.replace(/^Role:.*$/gm, '')
+		.replace(/^Constraint Check:.*$/gm, '')
+		.replace(/^Self-Correction:.*$/gm, '')
+		.replace(/^Wait.*$/gm, '')
+		.trim();
+
+	// Si después de limpiar quedó vacío o muy corto, devolver el original
+	if (cleaned.length < 10) return response;
+	return cleaned;
+}
+
 // ─── AGENTE VENTAS ───────────────────────────────────────────────────────────
 
 export class VentasAgent implements IAgent {
@@ -55,10 +76,10 @@ REGLAS:
 CATÁLOGO DISPONIBLE:
 ${productList}`;
 
-		const response = await generateResponse(
+		const response = cleanResponse(await generateResponse(
 			`HISTORIAL:\n${formatHistory(context?.history)}\n\nMENSAJE DEL CLIENTE: ${message}`,
 			systemPrompt
-		);
+		));
 
 		return {
 			response,
@@ -86,10 +107,10 @@ REGLAS:
 - Responde SIEMPRE en español. Máximo 150 palabras.
 - NO muestres tu razonamiento interno. Solo responde directamente al cliente.`;
 
-		const response = await generateResponse(
+		const response = cleanResponse(await generateResponse(
 			`HISTORIAL:\n${formatHistory(context?.history)}\n\nMENSAJE: ${message}`,
 			systemPrompt
-		);
+		));
 
 		return {
 			response,
@@ -117,10 +138,10 @@ REGLAS:
 - Responde SIEMPRE en español. Máximo 200 palabras.
 - NO muestres tu razonamiento interno. Solo responde directamente al cliente.`;
 
-		const response = await generateResponse(
+		const response = cleanResponse(await generateResponse(
 			`HISTORIAL:\n${formatHistory(context?.history)}\n\nMENSAJE: ${message}`,
 			systemPrompt
-		);
+		));
 
 		return {
 			response,
@@ -158,10 +179,10 @@ REGLAS:
 - NO muestres tu razonamiento interno. Solo responde directamente al cliente.
 ${productInfo}`;
 
-		const response = await generateResponse(
+		const response = cleanResponse(await generateResponse(
 			`HISTORIAL:\n${formatHistory(context?.history)}\n\nMENSAJE: ${message}`,
 			systemPrompt
-		);
+		));
 
 		return {
 			response,
@@ -192,10 +213,10 @@ REGLAS:
 - Responde SIEMPRE en español. Máximo 200 palabras.
 - NO muestres tu razonamiento interno. Solo responde directamente al cliente.`;
 
-		const response = await generateResponse(
+		const response = cleanResponse(await generateResponse(
 			`HISTORIAL:\n${formatHistory(context?.history)}\n\nMENSAJE: ${message}`,
 			systemPrompt
-		);
+		));
 
 		return {
 			response,
@@ -226,10 +247,10 @@ REGLAS:
 - Responde SIEMPRE en español. Máximo 200 palabras.
 - NO muestres tu razonamiento interno. Solo responde directamente al cliente.`;
 
-		const response = await generateResponse(
+		const response = cleanResponse(await generateResponse(
 			`HISTORIAL:\n${formatHistory(context?.history)}\n\nMENSAJE: ${message}`,
 			systemPrompt
-		);
+		));
 
 		return {
 			response,
@@ -262,10 +283,10 @@ REGLAS:
 - Responde SIEMPRE en español. Máximo 150 palabras.
 - NO muestres tu razonamiento interno. Solo responde directamente al cliente.`;
 
-		const response = await generateResponse(
+		const response = cleanResponse(await generateResponse(
 			`HISTORIAL:\n${formatHistory(context?.history)}\n\nMENSAJE: ${message}`,
 			systemPrompt
-		);
+		));
 
 		return {
 			response,
