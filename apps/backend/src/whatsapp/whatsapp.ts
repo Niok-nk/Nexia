@@ -59,7 +59,7 @@ export const initWhatsApp = async (forceNewSession = false): Promise<Client | nu
 			webVersionCache: {
 				type: 'remote',
 				remotePath:
-					'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
+					'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.57.html',
 			},
 			puppeteer: {
 				headless: true,
@@ -70,6 +70,7 @@ export const initWhatsApp = async (forceNewSession = false): Promise<Client | nu
 					'--no-first-run',
 					'--disable-setuid-sandbox',
 					'--no-sandbox',
+					'--disable-blink-features=AutomationControlled',
 				],
 			},
 		});
@@ -113,6 +114,10 @@ export const initWhatsApp = async (forceNewSession = false): Promise<Client | nu
 				await initWhatsApp(true);
 				isReconnecting = false;
 			}, 2000);
+		});
+
+		client.on('change_state', (state: string) => {
+			logger.info({ state }, 'WhatsApp state changed');
 		});
 
 		// Conectar mensajes entrantes al handler
