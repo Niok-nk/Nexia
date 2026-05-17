@@ -15,15 +15,26 @@ import logger from '../utils/logger.js';
  * 7. Envía la respuesta por WhatsApp
  */
 export async function handleIncomingMessage(msg: Message): Promise<void> {
+	logger.info({ msgFrom: msg.from, msgFromMe: msg.fromMe }, 'Message event received');
+
 	// Ignorar mensajes del propio número
-	if (msg.fromMe) return;
+	if (msg.fromMe) {
+		logger.info('Ignoring message fromMe');
+		return;
+	}
 	// Ignorar mensajes de grupos
-	if (msg.from.endsWith('@g.us')) return;
+	if (msg.from.endsWith('@g.us')) {
+		logger.info('Ignoring group message');
+		return;
+	}
 
 	const phone = msg.from.replace('@c.us', '');
 	const body = msg.body?.trim();
 
-	if (!body) return;
+	if (!body) {
+		logger.warn({ phone }, 'Empty message body, ignoring');
+		return;
+	}
 
 	logger.info({ phone, body: body.slice(0, 80) }, 'Incoming WA message');
 
