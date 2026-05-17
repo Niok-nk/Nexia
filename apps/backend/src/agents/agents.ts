@@ -25,64 +25,73 @@ function formatHistory(history: Array<{ direction: string; body: string }>): str
 
 // ─── Helper para limpiar respuesta de razonamiento interno ─────────────────
 function cleanResponse(response: string): string {
-	// Si la respuesta contiene patrones de razonamiento interno, extraer solo la parte útil
-	const reasonPatterns = [
+	// Eliminar TODAS las líneas que contengan patrones de razonamiento
+	const lines = response.split('\n');
+	const cleanLines: string[] = [];
+
+	const skipPatterns = [
+		/User Message:/i,
+		/Goal:/i,
+		/Tone:/i,
+		/Constraints:/i,
+		/Greet/i,
+		/Introduce/i,
+		/Since the catalog/i,
+		/Friendly \?/i,
+		/Professional \?/i,
+		/Emojis \?/i,
+		/Spanish \?/i,
+		/Max \d+ words/i,
+		/No markers/i,
+		/Call to action/i,
+		/Constraint Check/i,
+		/Customer Input/i,
+		/Context\/History/i,
+		/Self-Correction/i,
 		/Role:/i,
 		/Catalog:/i,
 		/Workflow:/i,
-		/Customer Input:/i,
-		/Context\/History:/i,
-		/Constraint Check:/i,
-		/Self-Correction:/i,
-		/Professional \?/i,
-		/Spanish \?/i,
-		/Clear CTA \?/i,
-		/\* [A-Z]/,
+		/\* [A-Z][a-z]/,
+		/^\*+$/,
 	];
 
-	const hasReasoning = reasonPatterns.some(p => p.test(response));
-
-	if (hasReasoning) {
-		// Buscar la última línea que parece ser respuesta real (contiene emojis o texto normal)
-		const lines = response.split('\n');
-		const usefulLines: string[] = [];
-
-		for (const line of lines) {
-			// Ignorar líneas que son puro razonamiento
-			const isReasoning = reasonPatterns.some(p => p.test(line)) && !line.match(/^[¡¿¡?]/);
-			// Ignorar líneas que son solo una palabra o muy cortas
-			const isShort = line.trim().length < 15;
-			// Ignorar líneas con muchos $
-			const isPrice = line.match(/^\s*\$?\d+[\d.,]*\s*$/);
-
-			if (!isReasoning && !isShort && !isPrice) {
-				usefulLines.push(line);
+	for (const line of lines) {
+		const trimmed = line.trim();
+		
+		// Saltar líneas que son solo asteriscos
+		if (/^\*+$/.test(trimmed) || /^\*[\s\*]*$/.test(trimmed)) {
+			continue;
+		}
+		
+		// Saltar líneas que son solo "Yes" o "No"
+		if (trimmed === 'Yes' || trimmed === 'No' || trimmed === 'yes' || trimmed === 'no') {
+			continue;
+		}
+		
+		// Saltar líneas que coinciden con los patrones de razonamiento
+		const shouldSkip = skipPatterns.some(p => p.test(trimmed));
+		if (shouldSkip) {
+			continue;
+		}
+		
+		// Saltar líneas muy cortas que probablemente son parte del razonamiento
+		if (trimmed.length > 0 && trimmed.length < 20 && !trimmed.match(/^[¡¿]/)) {
+			// Pero mantener si contiene emojis
+			if (!trimmed.match(/[\u{1F300}-\u{1F9FF}]/u)) {
+				continue;
 			}
 		}
-
-		if (usefulLines.length > 0) {
-			const cleaned = usefulLines.join(' ').replace(/\s+/g, ' ').trim();
-			if (cleaned.length > 20) return cleaned;
-		}
-
-		// Si no se pudo limpiar, buscar después del último patrón de razonamiento
-		const lastReasonIndex = response.search(/Professional \?.*Spanish \?.*Clear CTA \?/i);
-		if (lastReasonIndex !== -1) {
-			const after = response.slice(lastReasonIndex + 50);
-			// Buscar el inicio de la respuesta real
-			const match = after.match(/[*$]?\s*([¡¿A-Z].+)/);
-			if (match) {
-				return match[1].trim();
-			}
-		}
+		
+		cleanLines.push(line);
 	}
 
-	// Limpieza básica
-	let cleaned = response
-		.replace(/\*[^*]+\*/g, '')
-		.replace(/\*\*[^*]+\*\*/g, '')
-		.replace(/_[^_]+_/g, '')
-		.trim();
+	// Unir las líneas limpias
+	let cleaned = cleanLines.join(' ').replace(/\s+/g, ' ').trim();
+
+	// Si quedó muy corto, devolver original
+	if (cleaned.length < 30) {
+		return response;
+	}
 
 	return cleaned;
 }
