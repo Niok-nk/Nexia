@@ -116,7 +116,14 @@ export const initWhatsApp = async (forceNewSession = false): Promise<Client | nu
 		});
 
 		// Conectar mensajes entrantes al handler
-		client.on('message', handleIncomingMessage);
+		client.on('message', async (msg) => {
+			logger.info({ msgId: msg.id._serialized, from: msg.from }, 'Message event caught');
+			await handleIncomingMessage(msg);
+		});
+
+		client.on('message_create', (msg) => {
+			logger.info({ msgId: msg.id._serialized, fromMe: msg.fromMe }, 'Message created event');
+		});
 
 		await client.initialize();
 		whatsappClient = client;
