@@ -423,6 +423,15 @@ tbody tr:hover { background: var(--color-bg-hover); }
   gap: var(--space-3);
   padding: var(--space-4);
 }
+.msg-item {
+  display: flex;
+}
+.msg-item.msg-inbound {
+  justify-content: flex-start;
+}
+.msg-item.msg-outbound {
+  justify-content: flex-end;
+}
 .msg-bubble {
   max-width: 80%;
   padding: var(--space-3) var(--space-4);

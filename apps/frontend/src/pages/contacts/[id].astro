@@ -109,7 +109,7 @@ const { id } = Astro.params;
             </div>
             <div class="msg-list" style="max-height:600px;overflow-y:auto;">
               ${messages.length ? messages.map((m) => `
-                <div>
+                <div class="msg-item ${m.direction === 'INBOUND' ? 'msg-inbound' : 'msg-outbound'}">
                   <div class="msg-bubble ${m.direction === 'INBOUND' ? 'inbound' : 'outbound'}">
                     ${m.body}
                     <div class="msg-meta">
