@@ -162,14 +162,15 @@ const { id } = Astro.params;
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ to: c.phone, message: msg }),
       });
+      const data = await res.json();
       if (res.ok) {
         input.value = '';
         loadContact();
       } else {
-        alert('Error al enviar mensaje');
+        alert(data.error || 'Error al enviar mensaje');
       }
     } catch {
-      alert('Error de conexión');
+      alert('Error de conexión. Verifica que WhatsApp esté conectado.');
     }
   }
 
