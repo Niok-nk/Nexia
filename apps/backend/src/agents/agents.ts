@@ -1,5 +1,6 @@
 import { generateResponse } from '../utils/gemini.js';
 import { wooCommerceService } from '../woocommerce/woocommerce.service.js';
+import logger from '../utils/logger.js';
 
 export interface AgentResponse {
 	response: string;
@@ -133,9 +134,13 @@ export class VentasAgent implements IAgent {
 	async handle(message: string, context: any): Promise<AgentResponse> {
 		let productList = '';
 		try {
+			logger.info({ query: message }, 'VentasAgent: searching products');
 			const products = await wooCommerceService.searchProducts(message, 4);
+			logger.info({ count: products.length, products: products.map(p => p.name) }, 'VentasAgent: products found');
 			productList = wooCommerceService.formatProductList(products);
-		} catch {
+			logger.info({ productList }, 'VentasAgent: productList generated');
+		} catch (error: any) {
+			logger.error({ error: error.message }, 'VentasAgent: error fetching products');
 			productList = 'Catálogo no disponible en este momento.';
 		}
 
@@ -144,7 +149,6 @@ export class VentasAgent implements IAgent {
 
 			datos: `Empresa: Electrodomésticos JLC (sitio web https://jlc-electronics.com/)
 Modalidades de compra: al por mayor (distribuidores) o al detal (crédito o contado).
-Cobertura especial: Putumayo tiene asesor dedicado.
 Asesora que cierra ventas: Cristina, WhatsApp +57 318 740 8190.
 
 Catálogo relacionado con la consulta:

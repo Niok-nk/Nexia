@@ -97,7 +97,7 @@ Categoría: ventas
 Mensaje: "Mi lavadora no centrifuga, ¿pueden revisarla?"
 Categoría: servicio_tecnico
 
-Mensaje: "Necesito el filtro de mi nevera marca Mabe"
+Mensaje: "Necesito el filtro de mi nevera marca JLC"
 Categoría: repuestos
 
 Mensaje: "¿Cuánto debo de mi crédito?"
