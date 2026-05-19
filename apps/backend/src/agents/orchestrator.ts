@@ -10,6 +10,7 @@ import {
 	PagosAgent,
 } from './agents.js';
 import { generateResponse } from '../utils/gemini.js';
+import logger from '../utils/logger.js';
 
 type IntentKey =
 	| 'bienvenida'
@@ -206,16 +207,25 @@ Categoría:`;
 		message: string,
 		context: any
 	): Promise<{ agentType: string; response: string }> {
-		const hasHistory = Array.isArray(context?.history) && context.history.length > 0;
-		const intent = await this.classifyIntent(message, hasHistory);
-		const agent = this.agents[intent] || this.agents.ventas;
+		try {
+			const hasHistory = Array.isArray(context?.history) && context.history.length > 0;
+			const intent = await this.classifyIntent(message, hasHistory);
+			logger.info({ intent, message: message.slice(0, 50) }, 'Orchestrator route');
+			const agent = this.agents[intent] || this.agents.ventas;
 
 		const result = await agent.handle(message, context);
 
-		return {
-			agentType: intent,
-			response: result.response,
-		};
+			return {
+				agentType: intent,
+				response: result.response,
+			};
+		} catch (error: any) {
+			logger.error({ error: error.message, message }, 'Orchestrator route error');
+			return {
+				agentType: 'ventas',
+				response: 'Disculpa, tuve un problema al procesar tu mensaje. Por favor intenta de nuevo.',
+			};
+		}
 	}
 }
 
