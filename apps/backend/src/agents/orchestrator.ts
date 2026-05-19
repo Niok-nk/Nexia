@@ -1,5 +1,6 @@
 import {
 	IAgent,
+	BienvenidaAgent,
 	VentasAgent,
 	CarteraAgent,
 	ServicioTecnicoAgent,
@@ -11,6 +12,7 @@ import {
 import { generateResponse } from '../utils/gemini.js';
 
 type IntentKey =
+	| 'bienvenida'
 	| 'ventas'
 	| 'cartera'
 	| 'servicio_tecnico'
@@ -21,6 +23,7 @@ type IntentKey =
 
 export class Orchestrator {
 	private agents: Record<IntentKey, IAgent> = {
+		bienvenida: new BienvenidaAgent(),
 		ventas: new VentasAgent(),
 		cartera: new CarteraAgent(),
 		servicio_tecnico: new ServicioTecnicoAgent(),
@@ -30,71 +33,121 @@ export class Orchestrator {
 		pagos: new PagosAgent(),
 	};
 
-	// ─── Atajo por palabras clave (rápido, sin llamar al modelo) ──────────────
+	// ─── Filtro 1: ¿Es un saludo / mensaje vago? ──────────────────────────────
 	//
-	// Gemma a veces falla la clasificación con mensajes muy cortos o ambiguos.
-	// Si el mensaje tiene palabras claves obvias, las atajamos aquí.
+	// Si el mensaje es un saludo simple, sin intención clara, o muy corto y
+	// vago, va al agente de Bienvenida. Esto evita que Gemma "adivine" la
+	// intención de un "hola" y lo mande a servicio técnico.
+
+	private isGreetingOrVague(message: string, hasHistory: boolean): boolean {
+		const m = message.toLowerCase().trim();
+
+		// Si ya hay historial, no es saludo inicial: dejamos que el clasificador decida.
+		if (hasHistory) return false;
+
+		// Mensaje vacío o solo emoji/símbolos
+		if (m.length === 0) return true;
+
+		// Lista de saludos / aperturas comunes (sin intención específica)
+		const greetings = [
+			'hola',
+			'holaa',
+			'holaaa',
+			'holi',
+			'ola',
+			'hello',
+			'hi',
+			'buenas',
+			'buenos dias',
+			'buenos días',
+			'buen dia',
+			'buen día',
+			'buenas tardes',
+			'buenas noches',
+			'que tal',
+			'qué tal',
+			'saludos',
+			'hey',
+			'oye',
+			'jlc',
+			'info',
+			'informacion',
+			'información',
+			'ayuda',
+			'help',
+			'menu',
+			'menú',
+			'opciones',
+			'inicio',
+			'empezar',
+			'comenzar',
+			'start',
+			'pregunta',
+			'consulta',
+			'quiero informacion',
+			'quiero información',
+			'necesito ayuda',
+			'?',
+			'??',
+		];
+
+		// Limpiar puntuación final para comparar
+		const cleaned = m.replace(/[.,!?¡¿]+$/g, '').trim();
+		if (greetings.includes(cleaned)) return true;
+
+		// Saludos con coma: "hola, ¿como estan?"
+		const firstWord = cleaned.split(/[\s,.]/)[0];
+		if (greetings.includes(firstWord) && cleaned.length < 25) return true;
+
+		// Muy corto y sin palabras clave de intención
+		if (cleaned.length < 4) return true;
+
+		return false;
+	}
+
+	// ─── Filtro 2: Atajo por palabras clave (sin llamar al modelo) ────────────
 
 	private quickIntent(message: string): IntentKey | null {
 		const m = message.toLowerCase();
 
-		// Distribuidores
 		if (/\b(distribuidor|distribuidores|ser distribuidor|al por mayor|mayorista|mayoreo)\b/.test(m)) {
 			return 'distribuidores';
 		}
-		// Vacantes / empleo
-		if (/\b(vacante|empleo|trabajo|hoja de vida|cv|curriculum|currículum|aplicar a)\b/.test(m)) {
+		if (/\b(vacante|empleo|trabajo|hoja de vida|cv|curriculum|currículum|aplicar a|aplicar al)\b/.test(m)) {
 			return 'vacantes';
 		}
-		// Servicio técnico
-		if (/\b(servicio t[eé]cnico|reparaci[oó]n|reparar|mantenimiento|no enciende|no funciona|da[ñn]ado|falla|aver[ií]a|garant[ií]a)\b/.test(m)) {
+		if (/\b(servicio t[eé]cnico|reparaci[oó]n|reparar|mantenimiento|no enciende|no funciona|no enfr[ií]a|no centrifuga|da[ñn]ado|da[ñn]ada|falla|aver[ií]a|garant[ií]a)\b/.test(m)) {
 			return 'servicio_tecnico';
 		}
-		// Repuestos
-		if (/\b(repuesto|repuestos|pieza|piezas|accesorio|accesorios)\b/.test(m)) {
+		if (/\b(repuesto|repuestos|pieza|piezas|accesorio|accesorios|filtro|empaque|resistencia|motor de)\b/.test(m)) {
 			return 'repuestos';
 		}
-		// Cartera
-		if (/\b(cartera|deuda|mora|cuota|cuotas|atrasado|estado de cuenta|saldo|recordatorio de pago)\b/.test(m)) {
+		if (/\b(cartera|deuda|mora|cuota|cuotas|atrasado|estado de cuenta|saldo|recordatorio de pago|cu[aá]nto debo|me debe|debo)\b/.test(m)) {
 			return 'cartera';
 		}
-		// Medios de pago (intención de pagar AHORA, no preguntar por deuda)
-		if (/\b(c[oó]mo pago|d[oó]nde pago|medio de pago|medios de pago|formas de pago|pse|tarjeta|transferencia|consignar|consignaci[oó]n)\b/.test(m)) {
+		if (/\b(c[oó]mo pago|d[oó]nde pago|medio de pago|medios de pago|formas de pago|forma de pago|pse|pagar con tarjeta|transferencia|consignar|consignaci[oó]n)\b/.test(m)) {
 			return 'pagos';
 		}
-		// Ventas
-		if (/\b(comprar|cotizar|cotizaci[oó]n|precio|cu[aá]nto cuesta|cu[aá]nto vale|nevera|lavadora|televisor|tv|estufa|microondas|licuadora|aire acondicionado|electrodom[eé]stico)\b/.test(m)) {
+		if (/\b(comprar|cotizar|cotizaci[oó]n|precio|cu[aá]nto cuesta|cu[aá]nto vale|nevera|lavadora|televisor|televisores|tv|estufa|microondas|licuadora|aire acondicionado|electrodom[eé]stico|electrodom[eé]sticos)\b/.test(m)) {
 			return 'ventas';
 		}
 
 		return null;
 	}
 
-	async classifyIntent(message: string): Promise<IntentKey> {
-		// 1. Atajo por palabras clave
-		const quick = this.quickIntent(message);
-		if (quick) return quick;
+	// ─── Filtro 3: Clasificación con el modelo (few-shot) ─────────────────────
 
-		// 2. Clasificación con el modelo (formato few-shot, Gemma-friendly)
-		const classificationPrompt = `Eres un clasificador. Tu única tarea es leer un mensaje de un cliente y responder con UNA SOLA palabra entre estas siete opciones:
+	private async classifyWithModel(message: string): Promise<IntentKey> {
+		const prompt = `Eres un clasificador. Lee el mensaje del cliente y responde con UNA SOLA palabra de esta lista:
 
 ventas | cartera | servicio_tecnico | repuestos | vacantes | distribuidores | pagos
-
-Significado de cada categoría:
-- ventas: quiere comprar, cotizar o pedir información de un electrodoméstico.
-- cartera: pregunta por su deuda, cuotas, estado de cuenta o recordatorio de pago.
-- servicio_tecnico: tiene un electrodoméstico dañado, con falla o necesita mantenimiento.
-- repuestos: busca un repuesto, pieza o accesorio.
-- vacantes: pregunta por trabajo, empleo o quiere enviar hoja de vida.
-- distribuidores: quiere ser distribuidor o comprar al por mayor.
-- pagos: pregunta cómo pagar, medios de pago o dónde pagar.
 
 Ejemplos:
 
 Mensaje: "Hola, quiero saber el precio de una nevera de 300 litros"
 Categoría: ventas
 
-Mensaje: "Mi lavadora no centrifuga, ¿pueden revisarla?"
+Mensaje: "Mi lavadora no centrifuga"
 Categoría: servicio_tecnico
 
 Mensaje: "Necesito el filtro de mi nevera marca JLC"
@@ -103,47 +156,58 @@ Categoría: repuestos
 Mensaje: "¿Cuánto debo de mi crédito?"
 Categoría: cartera
 
-Mensaje: "¿Tienen vacantes para asesor comercial?"
+Mensaje: "¿Tienen vacantes?"
 Categoría: vacantes
 
 Mensaje: "Quiero ser distribuidor en Cali"
 Categoría: distribuidores
 
-Mensaje: "¿Puedo pagar con tarjeta de crédito?"
+Mensaje: "¿Puedo pagar con tarjeta?"
 Categoría: pagos
-
-Ahora clasifica este mensaje. Responde SOLO la palabra de la categoría, nada más.
 
 Mensaje: "${message.replace(/"/g, "'")}"
 Categoría:`;
 
 		let raw = '';
 		try {
-			raw = await generateResponse(classificationPrompt);
+			raw = await generateResponse(prompt);
 		} catch {
 			return 'ventas';
 		}
 
-		const category = (raw || '').toLowerCase().trim();
+		const cat = (raw || '').toLowerCase().trim().split(/[\s\n.,!]/)[0];
 
-		// 3. Matching tolerante (Gemma a veces agrega texto extra)
-		if (/servicio[_ ]?t[eé]cnico|servicio|t[eé]cnico/.test(category)) return 'servicio_tecnico';
-		if (/distribuidor/.test(category)) return 'distribuidores';
-		if (/repuesto/.test(category)) return 'repuestos';
-		if (/vacante|empleo|trabajo/.test(category)) return 'vacantes';
-		if (/cartera|deuda|cuota/.test(category)) return 'cartera';
-		if (/\bpago\b|pagos|medio de pago/.test(category)) return 'pagos';
-		if (/venta/.test(category)) return 'ventas';
+		if (/servicio|t[eé]cnico/.test(cat)) return 'servicio_tecnico';
+		if (/distribuidor/.test(cat)) return 'distribuidores';
+		if (/repuesto/.test(cat)) return 'repuestos';
+		if (/vacante|empleo|trabajo/.test(cat)) return 'vacantes';
+		if (/cartera|deuda|cuota/.test(cat)) return 'cartera';
+		if (/^pago/.test(cat) || /medio/.test(cat)) return 'pagos';
+		if (/venta/.test(cat)) return 'ventas';
 
-		// 4. Fallback seguro
 		return 'ventas';
+	}
+
+	// ─── Clasificación general ────────────────────────────────────────────────
+
+	async classifyIntent(message: string, hasHistory = false): Promise<IntentKey> {
+		// Paso 1: saludo / vago → bienvenida
+		if (this.isGreetingOrVague(message, hasHistory)) return 'bienvenida';
+
+		// Paso 2: palabras clave
+		const quick = this.quickIntent(message);
+		if (quick) return quick;
+
+		// Paso 3: modelo
+		return this.classifyWithModel(message);
 	}
 
 	async route(
 		message: string,
 		context: any
 	): Promise<{ agentType: string; response: string }> {
-		const intent = await this.classifyIntent(message);
+		const hasHistory = Array.isArray(context?.history) && context.history.length > 0;
+		const intent = await this.classifyIntent(message, hasHistory);
 		const agent = this.agents[intent] || this.agents.ventas;
 
 		const result = await agent.handle(message, context);

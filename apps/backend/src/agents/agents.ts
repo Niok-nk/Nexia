@@ -1,6 +1,5 @@
 import { generateResponse } from '../utils/gemini.js';
 import { wooCommerceService } from '../woocommerce/woocommerce.service.js';
-import logger from '../utils/logger.js';
 
 export interface AgentResponse {
 	response: string;
@@ -26,41 +25,56 @@ function formatHistory(history: Array<{ direction: string; body: string }>): str
 
 // ─── Helper: limpiar respuesta de Gemma ──────────────────────────────────────
 //
-// Gemma a veces incluye razonamiento ("Goal:", "Tone:", asteriscos, etc.)
-// antes de la respuesta final. Esta función intenta extraer solo la respuesta
-// dirigida al cliente.
+// Gemma muestra TODO su razonamiento ("Role:", "Task:", "Draft 1:",
+// "Check constraints:", asteriscos, etc.). Este filtro es agresivo.
 
 function cleanResponse(raw: string): string {
 	if (!raw) return '';
 	let text = raw.trim();
 
-	// 1. Eliminar bloques de razonamiento explícito
+	// 1. Eliminar bloques de pensamiento estilo Gemma/DeepSeek
 	text = text.replace(/<think>[\s\S]*?<\/think>/gi, '');
-	text = text.replace(/```[\s\S]*?```/g, ''); // bloques de código
-	text = text.replace(/\*\*[^*]+\*\*/g, (m) => m.replace(/\*/g, '')); // bold markdown
+	text = text.replace(/```[\s\S]*?```/g, '');
 
-	// 2. Si Gemma marca explícitamente la respuesta final, cortar ahí
+	// 2. Si hay un marcador de "borrador final" / "respuesta", quedarse SOLO
+	//    con lo que viene después de la última ocurrencia
 	const finalMarkers = [
-		/(?:^|\n)\s*(?:respuesta final|respuesta al cliente|respuesta|mensaje al cliente|asistente|assistant|output|final)\s*:\s*/i,
+		/(?:^|\n)\s*\**\s*(?:draft\s*\d*\s*final|final\s*draft|borrador final|respuesta final|respuesta al cliente|mensaje al cliente|respuesta|asistente|assistant|output|final answer|final)\s*:?\s*\**\s*\n/gi,
 	];
 	for (const re of finalMarkers) {
-		const m = text.match(re);
-		if (m && typeof m.index === 'number') {
-			text = text.slice(m.index + m[0].length);
-			break;
+		let lastMatch: RegExpExecArray | null = null;
+		let m: RegExpExecArray | null;
+		while ((m = re.exec(text)) !== null) lastMatch = m;
+		if (lastMatch && typeof lastMatch.index === 'number') {
+			text = text.slice(lastMatch.index + lastMatch[0].length);
 		}
 	}
 
-	// 3. Eliminar líneas que son claramente razonamiento interno
+	// 3. Si Gemma puso un "Draft 1:" tipo borrador, queremos lo que sigue
+	const draftRe = /(?:^|\n)\s*\**\s*draft\s*\d+\s*\**\s*:?\s*\**\s*\n?/gi;
+	let lastDraft: RegExpExecArray | null = null;
+	let dm: RegExpExecArray | null;
+	while ((dm = draftRe.exec(text)) !== null) lastDraft = dm;
+	if (lastDraft && typeof lastDraft.index === 'number') {
+		text = text.slice(lastDraft.index + lastDraft[0].length);
+	}
+
+	// 4. Eliminar líneas que son razonamiento (encabezados conocidos)
 	const skipPatterns = [
-		/^(user message|customer input|customer message|mensaje del cliente)\s*:/i,
-		/^(goal|objetivo|tono|tone|constraints|restricciones|reglas|rules)\s*:/i,
-		/^(role|rol|catalog|catálogo|workflow|context|contexto|history|historial)\s*:/i,
-		/^(self[- ]correction|constraint check|check|análisis|analysis|reasoning|razonamiento)\s*:/i,
-		/^(paso \d+|step \d+)\s*[:\-]/i,
-		/^(yes|no|sí|si)\s*$/i,
-		/^[*\-_=]{2,}\s*$/, // líneas de solo símbolos
-		/^\s*[*\-]\s*(friendly|professional|emojis|spanish|max \d+ words)/i,
+		/^\**\s*(role|rol|task|tarea|company data|company|datos de la empresa|empresa)\s*:/i,
+		/^\**\s*(interaction protocol|protocol|protocolo|flujo|workflow|catalog|catálogo)\s*:/i,
+		/^\**\s*(constraints|restricciones|reglas|rules|format|formato|output)\s*:/i,
+		/^\**\s*(customer|cliente|customer input|customer message|user message|mensaje del cliente|mensaje)\s*:/i,
+		/^\**\s*(status|estado|context|contexto|history|historial)\s*:/i,
+		/^\**\s*(goal|objetivo|tone|tono|reasoning|razonamiento|analysis|análisis|self[- ]correction|check|constraint check)\s*:/i,
+		/^\**\s*(greet|saludar|introduce|presentar|ask|preguntar|provide|recommend|recomendar)\b/i,
+		/^\**\s*(first contact|no data provided|primer contacto)/i,
+		/^\**\s*(paso \d+|step \d+)\b/i,
+		/^\s*(yes|no|sí|si)\s*\.?\s*$/i,
+		/^\s*[*\-_=#]{2,}\s*$/, // líneas decorativas
+		/^\s*[•\-*]\s*(friendly|professional|emojis|spanish|max\s*\d+\s*words)/i,
+		/^\s*max\s*\d+\s*(words|palabras)/i,
+		/^\s*\?+\s*$/,
 	];
 
 	const lines = text.split('\n');
@@ -71,59 +85,108 @@ function cleanResponse(raw: string): string {
 			kept.push('');
 			continue;
 		}
+		// Línea que SOLO contiene viñetas/asteriscos sin texto real
+		if (/^[\s*•\-#=_]+$/.test(t)) continue;
+		// Línea que parece un encabezado de razonamiento
 		if (skipPatterns.some((p) => p.test(t))) continue;
-		kept.push(line);
+		// Quitar viñetas iniciales (* - •) pero mantener el contenido
+		const stripped = line.replace(/^\s*[*•\-]\s+/, '');
+		kept.push(stripped);
 	}
 
 	let cleaned = kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 
-	// 4. Si quedó vacío o demasiado corto, devolver el original sin etiquetas
-	if (cleaned.length < 20) {
-		cleaned = raw.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+	// 5. Eliminar TODO asterisco residual (Gemma los usa para *énfasis* y como bullets)
+	cleaned = cleaned.replace(/\*+/g, '').trim();
+
+	// 6. Si la respuesta aparece duplicada al final (problema observado),
+	//    tomar solo la primera versión.
+	//    Detecta: "TEXTOTEXTO" donde TEXTO termina con signo de puntuación.
+	const dupMatch = cleaned.match(/^(.+?[.!?])\s*\1\s*$/s);
+	if (dupMatch) cleaned = dupMatch[1].trim();
+
+	// 7. Si quedó vacío, último recurso: el texto original sin asteriscos ni
+	//    líneas con ":"  al inicio.
+	if (cleaned.length < 15) {
+		cleaned = raw
+			.split('\n')
+			.filter((l) => !/^\s*\**\s*[A-Za-zÁÉÍÓÚáéíóúñÑ ]{2,30}\s*:/.test(l))
+			.join('\n')
+			.replace(/\*+/g, '')
+			.trim();
 	}
 
 	return cleaned;
 }
 
-// ─── Constructor de prompt estilo Gemma ──────────────────────────────────────
+// ─── Constructor de prompt few-shot (Gemma-friendly) ─────────────────────────
 //
-// Gemma sigue mejor instrucciones cuando:
-//  - El rol está al inicio en UNA frase clara.
-//  - La información de la empresa va como "DATOS" (no como pseudocódigo).
-//  - El flujo se describe en lenguaje natural numerado.
-//  - Las reglas de formato van al FINAL, justo antes del input del cliente.
-//  - El input del cliente va separado con marcadores claros.
+// Clave: en lugar de listar "reglas" (que Gemma trata como instrucciones a
+// procesar y razonar), mostramos EJEMPLOS de mensaje del cliente → respuesta
+// del asistente. Gemma imita ejemplos mucho mejor que sigue reglas.
+
+interface FewShotExample {
+	cliente: string;
+	asistente: string;
+}
 
 function buildGemmaPrompt(opts: {
 	rol: string;
-	datos: string;
-	flujo: string;
-	reglas: string;
+	datos?: string;
+	ejemplos: FewShotExample[];
 	historial: string;
 	mensajeCliente: string;
 }): { system: string; user: string } {
+	const ejemplosTexto = opts.ejemplos
+		.map(
+			(e) =>
+				`Cliente: ${e.cliente}\nAsistente: ${e.asistente}`
+		)
+		.join('\n\n');
+
 	const system = `${opts.rol}
 
-DATOS DE LA EMPRESA:
-${opts.datos}
+${opts.datos ? `INFORMACIÓN DE REFERENCIA:\n${opts.datos}\n\n` : ''}A continuación verás ejemplos de cómo respondes. Tu respuesta debe imitar EXACTAMENTE este estilo: directa, breve, en español, sin asteriscos, sin encabezados, sin explicar tu razonamiento, sin escribir "Asistente:" ni "Respuesta:".
 
-CÓMO ATENDER AL CLIENTE:
-${opts.flujo}
+${ejemplosTexto}`;
 
-REGLAS DE FORMATO (obligatorias):
-${opts.reglas}
-
-IMPORTANTE: Responde ÚNICAMENTE con el texto que el cliente debe leer. No escribas "Respuesta:", no muestres pasos, no uses asteriscos, no expliques tu razonamiento. Solo el mensaje al cliente, en español natural.`;
-
-	const user = `Historial reciente:
-${opts.historial}
-
-Mensaje actual del cliente:
-"${opts.mensajeCliente}"
-
-Escribe tu respuesta al cliente:`;
+	const user = `${opts.historial !== '(primer mensaje del cliente)' ? `Historial:\n${opts.historial}\n\n` : ''}Cliente: ${opts.mensajeCliente}
+Asistente:`;
 
 	return { system, user };
+}
+
+// ─── AGENTE BIENVENIDA ───────────────────────────────────────────────────────
+//
+// Maneja saludos, mensajes vagos, "hola", "buenos días", "info", etc.
+// NO usa el modelo — responde con plantillas determinísticas, porque para
+// un saludo no hay razón de gastar un LLM y queremos respuesta instantánea
+// y predecible.
+
+export class BienvenidaAgent implements IAgent {
+	name = 'Bienvenida';
+
+	async handle(message: string, _context: any): Promise<AgentResponse> {
+		const hora = new Date().getHours();
+		let saludo = 'Hola';
+		if (hora >= 5 && hora < 12) saludo = 'Buenos días';
+		else if (hora >= 12 && hora < 19) saludo = 'Buenas tardes';
+		else saludo = 'Buenas noches';
+
+		const response = `${saludo}, bienvenido(a) a Electrodomésticos JLC. 😊 ¿En qué puedo ayudarte hoy? Puedes preguntarme por:
+
+• Compra o cotización de electrodomésticos
+• Repuestos
+• Servicio técnico
+• Medios de pago
+• Distribuidores
+• Vacantes`;
+
+		return {
+			response,
+			metadata: { agentType: 'bienvenida' },
+		};
+	}
 }
 
 // ─── AGENTE VENTAS ───────────────────────────────────────────────────────────
@@ -134,42 +197,49 @@ export class VentasAgent implements IAgent {
 	async handle(message: string, context: any): Promise<AgentResponse> {
 		let productList = '';
 		try {
-			logger.info({ query: message }, 'VentasAgent: searching products');
 			const products = await wooCommerceService.searchProducts(message, 4);
-			logger.info({ count: products.length, products: products.map(p => p.name) }, 'VentasAgent: products found');
 			productList = wooCommerceService.formatProductList(products);
-			logger.info({ productList }, 'VentasAgent: productList generated');
-		} catch (error: any) {
-			logger.error({ error: error.message }, 'VentasAgent: error fetching products');
+		} catch {
 			productList = 'Catálogo no disponible en este momento.';
 		}
 
 		const { system, user } = buildGemmaPrompt({
-			rol: 'Eres un asesor comercial de Electrodomésticos JLC. Tu trabajo es atender clientes que quieren comprar electrodomésticos, cotizar, o pedir información de productos.',
+			rol: 'Eres asesor comercial de Electrodomésticos JLC. Atiendes clientes que quieren comprar o cotizar electrodomésticos. Hablas en español de Colombia, eres cordial, breve y directo.',
+			datos: `Cierre de ventas: Cristina, WhatsApp +57 318 740 8190.
+Compra al detal: contado o crédito.
+Compra al por mayor: se atiende por el área de distribuidores.
+Zona Putumayo tiene asesor dedicado.
+Sitio web: https://jlc-electronics.com/
 
-			datos: `Empresa: Electrodomésticos JLC (sitio web https://jlc-electronics.com/)
-Modalidades de compra: al por mayor (distribuidores) o al detal (crédito o contado).
-Asesora que cierra ventas: Cristina, WhatsApp +57 318 740 8190.
-
-Catálogo relacionado con la consulta:
-${productList || 'Sin coincidencias en catálogo.'}`,
-
-			flujo: `1. Saluda brevemente y preséntate como asesor de JLC.
-2. Pregunta qué producto necesita y desde qué ciudad escribe.
-3. Pregunta si la compra es al por mayor o al detal.
-   - Si es al por mayor: dile que lo conectarás con el área de distribuidores y pide su nombre, ciudad y NIT.
-   - Si es al detal: pregunta si desea pagar de contado o a crédito.
-4. Si es al detal CONTADO: indica el artículo, precio, disponibilidad en su zona, y menciona que los medios de pago están en la página web. Cierra ofreciendo el contacto de Cristina (+57 318 740 8190) para finalizar la venta.
-5. Si es al detal CRÉDITO: explica que para crédito se necesita un formulario con datos personales, de residencia, laborales y financieros, y que Cristina (+57 318 740 8190) lo gestiona. Pide primero nombre, cédula e ingresos mensuales para iniciar.
-6. Si la ciudad es Putumayo: indica que hay un asesor dedicado para esa zona y pide los datos básicos para conectarlo.
-7. Si la ciudad no tiene cobertura: avisa amablemente que aún no llegan a esa zona.`,
-
-			reglas: `- Máximo 80 palabras por respuesta.
-- Tono cordial, claro, profesional, en español de Colombia.
-- Una sola pregunta o llamada a la acción al final.
-- No repitas todo el flujo: avanza un paso a la vez según el historial.
-- No uses asteriscos, viñetas con * ni encabezados.`,
-
+Productos relacionados con la consulta:
+${productList || 'Sin coincidencias.'}`,
+			ejemplos: [
+				{
+					cliente: 'Quiero saber el precio de una nevera',
+					asistente:
+						'¡Con gusto! Para darte el precio exacto, ¿desde qué ciudad escribes y qué tipo de nevera buscas (capacidad o marca)? También, ¿la compra sería al contado o a crédito?',
+				},
+				{
+					cliente: 'Me interesa una lavadora LG de 18 kilos',
+					asistente:
+						'¡Excelente elección! ¿La compra sería al contado o a crédito? Y cuéntame desde qué ciudad escribes para confirmar disponibilidad.',
+				},
+				{
+					cliente: 'A crédito por favor',
+					asistente:
+						'Perfecto. Para iniciar el estudio de crédito necesito tres datos: tu nombre completo, número de cédula e ingresos mensuales. Luego Cristina (+57 318 740 8190) continúa la gestión.',
+				},
+				{
+					cliente: 'Al contado',
+					asistente:
+						'¡Genial! Confírmame el modelo exacto que te interesa y tu ciudad, y te paso precio y disponibilidad. Después te conecto con Cristina (+57 318 740 8190) para finalizar la compra.',
+				},
+				{
+					cliente: 'Soy de Mocoa, Putumayo',
+					asistente:
+						'¡Bienvenido! Para Putumayo tenemos asesor dedicado. Cuéntame qué producto buscas y te paso el contacto directo del asesor de tu zona.',
+				},
+			],
 			historial: formatHistory(context?.history),
 			mensajeCliente: message,
 		});
@@ -192,25 +262,27 @@ export class CarteraAgent implements IAgent {
 
 	async handle(message: string, context: any): Promise<AgentResponse> {
 		const { system, user } = buildGemmaPrompt({
-			rol: 'Eres asistente del área de cartera de Electrodomésticos JLC. Tu trabajo es redirigir al cliente a los canales correctos porque desde este chat no se accede a información personal de cartera.',
-
-			datos: `Canales oficiales de cartera y facturación:
-- WhatsApp cartera: +57 314 422 9949 y +57 315 721 2367
-- Soporte de pago de crédito: enviar al WhatsApp +57 314 422 9949 o +57 315 721 2367
-- Línea telefónica: +57 320 788 1108 (horario 12:30 p.m. a 2:30 p.m.)
-- Correo para peticiones con soportes: callcenter5@electromillonaria.co`,
-
-			flujo: `1. Reconoce con empatía la consulta del cliente (pago, deuda, recordatorio, etc.).
-2. Explica que desde esta línea no se puede acceder a su información personal.
-3. Comparte los canales oficiales según lo que pida: WhatsApp de cartera, línea telefónica o correo.
-4. Si menciona dificultades para pagar, sugiere comunicarse con cartera para evaluar una reestructuración.
-5. Cierra preguntando si necesita algo más.`,
-
-			reglas: `- Máximo 70 palabras.
-- Tono amable pero firme.
-- Incluye los números o correo solo si son relevantes a lo que pide.
-- Sin asteriscos ni viñetas con símbolos.`,
-
+			rol: 'Eres asistente de cartera de Electrodomésticos JLC. Desde este chat no se accede a información personal de cartera, por lo que tu trabajo es redirigir amablemente al cliente a los canales oficiales.',
+			datos: `WhatsApp cartera: +57 314 422 9949 y +57 315 721 2367
+Línea telefónica: +57 320 788 1108 (horario 12:30 p.m. a 2:30 p.m.)
+Correo para peticiones: callcenter5@electromillonaria.co`,
+			ejemplos: [
+				{
+					cliente: '¿Cuánto debo de mi crédito?',
+					asistente:
+						'Desde esta línea no puedo acceder a tu información personal. Por favor comunícate con nuestra área de cartera al WhatsApp +57 314 422 9949 o +57 315 721 2367 y con gusto te dan el detalle.',
+				},
+				{
+					cliente: 'Ya pagué la cuota, ¿dónde envío el soporte?',
+					asistente:
+						'¡Gracias por avisar! Envía tu soporte de pago al WhatsApp de cartera: +57 314 422 9949 o +57 315 721 2367. Allí lo registran y te confirman.',
+				},
+				{
+					cliente: 'Estoy atrasado, no puedo pagar este mes',
+					asistente:
+						'Entiendo tu situación. Te invito a comunicarte con cartera al +57 314 422 9949 para revisar opciones de reestructuración. También puedes llamar al +57 320 788 1108 entre 12:30 y 2:30 p.m.',
+				},
+			],
 			historial: formatHistory(context?.history),
 			mensajeCliente: message,
 		});
@@ -232,24 +304,28 @@ export class ServicioTecnicoAgent implements IAgent {
 
 	async handle(message: string, context: any): Promise<AgentResponse> {
 		const { system, user } = buildGemmaPrompt({
-			rol: 'Eres asistente de servicio técnico de Electrodomésticos JLC. Tu trabajo es ayudar al cliente con reparaciones, mantenimiento o fallas de sus electrodomésticos, y conectarlo con el equipo técnico cuando corresponda.',
-
-			datos: `Contactos de servicio técnico JLC:
-- Servicio Técnico JLC: +57 320 788 1151
-- Servicio Técnico JLC (Diego): +57 320 788 1110
-- Sitio web: https://jlc-electronics.com/servicio-tecnico/
-Horario de atención: lunes a sábado, 8:00 a.m. a 5:00 p.m.`,
-
-			flujo: `1. Saluda brevemente y pregunta qué electrodoméstico presenta la falla (marca, modelo y, si lo sabe, año).
-2. Pide que describa los síntomas (qué falla exactamente, cuándo ocurre).
-3. Indica los canales de servicio técnico (números arriba) y el horario de atención.
-4. Si ya dio todos los datos, recomiéndale escribir directamente al número de servicio técnico para agendar.`,
-
-			reglas: `- Máximo 80 palabras.
-- Tono profesional, cercano.
-- Una pregunta a la vez si faltan datos.
-- Sin asteriscos ni listas con símbolos.`,
-
+			rol: 'Eres asistente de servicio técnico de Electrodomésticos JLC. Atiendes clientes con electrodomésticos dañados, mantenimiento o fallas.',
+			datos: `Servicio Técnico JLC: +57 320 788 1151
+Servicio Técnico JLC (Diego): +57 320 788 1110
+Sitio web: https://jlc-electronics.com/servicio-tecnico/
+Horario: lunes a sábado, 8:00 a.m. a 5:00 p.m.`,
+			ejemplos: [
+				{
+					cliente: 'Mi lavadora no centrifuga',
+					asistente:
+						'Lamento la falla. ¿Me indicas la marca, modelo y, si lo sabes, el año de tu lavadora? Con esos datos te orientamos mejor o agendamos la revisión.',
+				},
+				{
+					cliente: 'Necesito mantenimiento para mi nevera Mabe',
+					asistente:
+						'¡Con gusto! ¿Me confirmas el modelo y el año aproximado de la nevera? Luego puedes escribir directamente al técnico al +57 320 788 1151 para agendar (lunes a sábado, 8 a.m. a 5 p.m.).',
+				},
+				{
+					cliente: 'Es una nevera LG modelo GT44, no enfría',
+					asistente:
+						'Gracias por los datos. Por favor escribe al WhatsApp de servicio técnico +57 320 788 1151 o +57 320 788 1110 (Diego) para agendar la visita. Atienden lunes a sábado de 8 a.m. a 5 p.m.',
+				},
+			],
 			historial: formatHistory(context?.history),
 			mensajeCliente: message,
 		});
@@ -281,23 +357,24 @@ export class RepuestosAgent implements IAgent {
 		}
 
 		const { system, user } = buildGemmaPrompt({
-			rol: 'Eres asistente de repuestos de Electrodomésticos JLC. Ayudas al cliente a encontrar el repuesto que necesita, dar precio y disponibilidad.',
-
-			datos: `Tiempos: si un repuesto no está en stock, el tiempo de pedido es de 3 a 5 días hábiles.
+			rol: 'Eres asistente de repuestos de Electrodomésticos JLC. Ayudas al cliente a encontrar el repuesto, precio y disponibilidad.',
+			datos: `Si no hay stock, el tiempo de pedido es 3 a 5 días hábiles.
 Sitio web: https://jlc-electronics.com/
 
-Repuestos relacionados con la consulta:
-${productInfo || 'Sin coincidencias en catálogo.'}`,
-
-			flujo: `1. Pregunta marca, modelo y año del electrodoméstico, y qué repuesto necesita (si no lo dio aún).
-2. Si encuentras coincidencias en el catálogo, indica precio y disponibilidad.
-3. Si no hay stock, avisa el tiempo de pedido (3 a 5 días).
-4. Cierra preguntando si desea reservarlo.`,
-
-			reglas: `- Máximo 70 palabras.
-- Tono claro y útil.
-- Sin asteriscos ni símbolos de lista.`,
-
+Repuestos relacionados:
+${productInfo || 'Sin coincidencias.'}`,
+			ejemplos: [
+				{
+					cliente: 'Necesito un filtro para nevera',
+					asistente:
+						'¡Con gusto te ayudo! ¿Me indicas marca, modelo y año de la nevera? Así confirmo el repuesto exacto y la disponibilidad.',
+				},
+				{
+					cliente: 'Es una nevera Mabe modelo RMA250',
+					asistente:
+						'Gracias. Voy a revisar disponibilidad del filtro para Mabe RMA250. Si tenemos stock te paso el precio; si no, el pedido tarda entre 3 y 5 días hábiles. ¿Te lo reservo?',
+				},
+			],
 			historial: formatHistory(context?.history),
 			mensajeCliente: message,
 		});
@@ -319,21 +396,22 @@ export class VacantesAgent implements IAgent {
 
 	async handle(message: string, context: any): Promise<AgentResponse> {
 		const { system, user } = buildGemmaPrompt({
-			rol: 'Eres asistente de recursos humanos de Electrodomésticos JLC. Atiendes a personas interesadas en trabajar con la empresa.',
-
-			datos: `Actualmente no hay un listado de vacantes cargado en el sistema.
-Para postularse, el candidato puede enviar su hoja de vida al correo de RRHH de la empresa o entregarla en el punto físico.
-Datos a recolectar del interesado: nombre completo, cargo de interés y ciudad.`,
-
-			flujo: `1. Agradece el interés en trabajar en JLC.
-2. Explica que en este momento no tienes un listado de vacantes cargado, pero puedes registrar su interés.
-3. Pide nombre completo, cargo de interés y ciudad.
-4. Indica que puede enviar su hoja de vida para quedar en base de datos.`,
-
-			reglas: `- Máximo 70 palabras.
-- Tono cordial y motivador.
-- Sin asteriscos ni listas con símbolos.`,
-
+			rol: 'Eres asistente de recursos humanos de Electrodomésticos JLC. Atiendes a personas interesadas en trabajar en la empresa.',
+			datos: `Actualmente no hay listado de vacantes cargado en el sistema.
+El interesado puede dejar sus datos para quedar en base de datos.
+Datos a recolectar: nombre completo, cargo de interés, ciudad.`,
+			ejemplos: [
+				{
+					cliente: '¿Tienen vacantes?',
+					asistente:
+						'¡Gracias por tu interés en trabajar con nosotros! En este momento no tengo el listado de vacantes vigentes a la mano, pero puedo registrar tu interés. ¿Me compartes tu nombre completo, cargo de interés y ciudad?',
+				},
+				{
+					cliente: 'Soy Carlos Pérez, busco asesor comercial en Cali',
+					asistente:
+						'¡Excelente, Carlos! Quedas registrado en nuestra base. Si quieres, envía tu hoja de vida para adjuntarla a tu perfil y que el área de RRHH te contacte cuando haya una vacante de asesor comercial en Cali.',
+				},
+			],
 			historial: formatHistory(context?.history),
 			mensajeCliente: message,
 		});
@@ -355,26 +433,32 @@ export class DistribuidoresAgent implements IAgent {
 
 	async handle(message: string, context: any): Promise<AgentResponse> {
 		const { system, user } = buildGemmaPrompt({
-			rol: 'Eres asistente del programa de distribuidores de Electrodomésticos JLC. Atiendes a personas o empresas que quieren ser distribuidores autorizados.',
-
-			datos: `Datos que debe entregar el aspirante a distribuidor:
-- NIT
-- Nombre o razón social
-- Teléfono de contacto
-- Correo electrónico
-- Rango de importe de ventas estimado
-- Departamento
-- Ciudad`,
-
-			flujo: `1. Da la bienvenida al programa de distribuidores.
-2. Explica brevemente que para evaluar la solicitud necesitas algunos datos.
-3. Pide los datos en grupos pequeños: primero NIT, nombre o razón social y ciudad; luego teléfono y correo; luego rango de ventas.
-4. No pidas todo de golpe: avanza un paso a la vez según ya haya respondido.`,
-
-			reglas: `- Máximo 60 palabras.
-- Tono profesional y motivador.
-- Sin asteriscos ni listas con símbolos.`,
-
+			rol: 'Eres asistente del programa de distribuidores de Electrodomésticos JLC. Atiendes a personas o empresas que quieren ser distribuidores autorizados o comprar al por mayor.',
+			datos: `Datos a recolectar (uno o dos por mensaje, no todos de golpe):
+1. NIT
+2. Nombre o razón social
+3. Teléfono
+4. Correo electrónico
+5. Rango de ventas estimado
+6. Departamento
+7. Ciudad`,
+			ejemplos: [
+				{
+					cliente: 'Quiero ser distribuidor',
+					asistente:
+						'¡Bienvenido al programa de distribuidores JLC! Para iniciar el registro, ¿me compartes tu nombre o razón social y la ciudad donde operarías?',
+				},
+				{
+					cliente: 'Soy Comercial XYZ SAS, en Medellín',
+					asistente:
+						'¡Excelente! Ahora, ¿me indicas tu NIT y un número de contacto para que el equipo de distribuidores te ubique?',
+				},
+				{
+					cliente: 'NIT 901234567, teléfono 3001234567',
+					asistente:
+						'¡Perfecto! Por último, ¿cuál es tu correo electrónico y un rango aproximado de ventas mensuales estimado? Con esto completamos tu solicitud.',
+				},
+			],
 			historial: formatHistory(context?.history),
 			mensajeCliente: message,
 		});
@@ -397,22 +481,27 @@ export class PagosAgent implements IAgent {
 	async handle(message: string, context: any): Promise<AgentResponse> {
 		const { system, user } = buildGemmaPrompt({
 			rol: 'Eres asistente de medios de pago de Electrodomésticos JLC. Ayudas al cliente a saber cómo pagar su compra.',
-
 			datos: `Opciones de pago:
-- En línea: el cliente selecciona el artículo en https://jlc-electronics.com/ y elige medio de pago al finalizar la compra.
+- En línea: el cliente entra a https://jlc-electronics.com/, selecciona el artículo y elige medio de pago al finalizar la compra (PSE, tarjeta, etc.).
 - En punto físico: pago directo en la tienda.
-- Para crédito: lo gestiona Cristina al WhatsApp +57 318 740 8190.`,
-
-			flujo: `1. Pregunta qué artículo quiere comprar (si aún no lo dijo).
-2. Explica las opciones de pago: en línea desde la página web o pago en punto físico.
-3. Comparte el enlace https://jlc-electronics.com/ para que pueda seleccionar el producto y proceder al pago.
-4. Si menciona crédito, redirígelo a Cristina (+57 318 740 8190).
-5. Pide que confirme cuando haya realizado el pago para coordinar la entrega.`,
-
-			reglas: `- Máximo 70 palabras.
-- Tono claro y útil.
-- Sin asteriscos ni listas con símbolos.`,
-
+- Crédito: lo gestiona Cristina al WhatsApp +57 318 740 8190.`,
+			ejemplos: [
+				{
+					cliente: '¿Cómo puedo pagar?',
+					asistente:
+						'Tenemos dos formas: 1) En línea entrando a https://jlc-electronics.com/, seleccionas el artículo y eliges medio de pago (PSE, tarjeta, etc.). 2) En el punto físico directamente en la tienda. ¿Cuál te queda más cómoda?',
+				},
+				{
+					cliente: '¿Aceptan tarjeta de crédito?',
+					asistente:
+						'¡Sí! Al finalizar la compra en https://jlc-electronics.com/ puedes pagar con tarjeta de crédito, débito o PSE. ¿Ya tienes el producto seleccionado?',
+				},
+				{
+					cliente: 'Quiero pagar a crédito',
+					asistente:
+						'¡Perfecto! El crédito lo gestiona Cristina directamente. Escríbele al WhatsApp +57 318 740 8190 con el producto que te interesa y ella te guía paso a paso.',
+				},
+			],
 			historial: formatHistory(context?.history),
 			mensajeCliente: message,
 		});
