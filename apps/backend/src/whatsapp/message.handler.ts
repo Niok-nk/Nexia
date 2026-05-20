@@ -1,4 +1,4 @@
-import { Message } from 'whatsapp-web.js';
+import { Message } from '@open-wa/wa-automate';
 import prisma from '../db/index.js';
 import { orchestrator } from '../agents/orchestrator.js';
 import { sendMessage, getStatus } from './whatsapp.js';
@@ -29,7 +29,7 @@ export async function handleIncomingMessage(msg: Message): Promise<void> {
 	}
 
 	// Extraer número de teléfono correctamente (manejar formato lid y c.us)
-	let phone = msg.from;
+	let phone: string = msg.from;
 	if (phone.includes('@lid')) {
 		// Formato legacy: 212519343923373@lid -> extraer solo números
 		phone = phone.replace('@lid', '');

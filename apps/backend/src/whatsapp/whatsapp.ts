@@ -1,8 +1,5 @@
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const { Client: WAClient, LocalAuth } = require('whatsapp-web.js');
-import type { Client } from 'whatsapp-web.js';
-import qrcode from 'qrcode';
+import { create, Client, ChatId, ev } from '@open-wa/wa-automate';
+import { execSync } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
 import logger from '../utils/logger.js';
@@ -11,6 +8,7 @@ import { handleIncomingMessage } from './message.handler.js';
 let whatsappClient: Client | null = null;
 let currentQR: string | null = null;
 let isReady = false;
+let isReconnecting = false;
 
 export type WAStatus = 'disconnected' | 'qr_pending' | 'connected';
 
@@ -22,17 +20,47 @@ export const getStatus = (): WAStatus => {
 
 export const getCurrentQR = (): string | null => currentQR;
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Limpia la sesión JSON y el SingletonLock del directorio de datos del navegador
+ * para evitar que quede bloqueado tras una reconexión.
+ */
 const clearSession = async (): Promise<void> => {
+	// 1. Borrar archivo de sesión open-wa
 	try {
-		const sessionPath = path.join(process.cwd(), 'wa_session', 'session-nexia-crm-client');
-		await fs.rm(sessionPath, { recursive: true, force: true });
-		logger.info('WhatsApp session cleared');
+		const sessionFilePath = path.join(process.cwd(), 'nexia-crm-client.data.json');
+		await fs.rm(sessionFilePath, { force: true });
+		logger.info('WhatsApp session file cleared');
 	} catch (error) {
-		logger.warn({ error }, 'Failed to clear session folder');
+		logger.warn({ error }, 'Failed to clear session file');
+	}
+
+	// 2. Borrar el SingletonLock del directorio de datos de Puppeteer
+	try {
+		const userDataDir = path.join(process.cwd(), '_IGNORE_nexia-crm-client');
+		const lockFile = path.join(userDataDir, 'SingletonLock');
+		await fs.rm(lockFile, { force: true });
+		logger.info('Browser SingletonLock cleared');
+	} catch (error) {
+		logger.warn({ error }, 'Failed to clear SingletonLock (may not exist)');
 	}
 };
 
-let isReconnecting = false;
+/**
+ * Fuerza el cierre de procesos Chrome que tengan el userDataDir de la sesión bloqueado.
+ */
+const killStaleChrome = (): void => {
+	try {
+		execSync(
+			'tasklist /FI "IMAGENAME eq chrome.exe" 2>NUL | findstr /i "chrome" && taskkill /F /IM chrome.exe /T 2>NUL || echo no-chrome',
+			{ stdio: 'ignore' }
+		);
+		logger.info('Stale Chrome processes killed');
+	} catch {
+		// No hay procesos chrome, está bien
+	}
+};
 
 export const initWhatsApp = async (forceNewSession = false): Promise<Client | null> => {
 	if (isReconnecting && !forceNewSession) {
@@ -44,107 +72,63 @@ export const initWhatsApp = async (forceNewSession = false): Promise<Client | nu
 		isReconnecting = false;
 		await clearSession();
 	}
+
 	try {
 		const chromePath =
 			process.env.CHROME_PATH ||
-			'C:\\Users\\Niok\\.cache\\puppeteer\\chrome\\win64-146.0.7680.31\\chrome-win64\\chrome.exe';
+			'C:\\Users\\Niok\\.cache\\puppeteer\\chrome\\win64-148.0.7778.97\\chrome-win64\\chrome.exe';
 
-		logger.info({ chromePath }, 'Initializing WhatsApp with Chrome');
+		logger.info({ chromePath }, 'Initializing WhatsApp with @open-wa/wa-automate');
 
-		const client = new WAClient({
-			authStrategy: new LocalAuth({
-				dataPath: './wa_session',
-				clientId: 'nexia-crm-client',
-			}),
-			takeOver: true,
-			webVersionCache: {
-				type: 'remote',
-				remotePath:
-					'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.57.html',
-			},
-			puppeteer: {
-				headless: true,
-				executablePath: chromePath,
-				args: [
-					'--disable-dev-shm-usage',
-					'--disable-gpu',
-					'--no-first-run',
-					'--disable-setuid-sandbox',
-					'--no-sandbox',
-					'--disable-blink-features=AutomationControlled',
-				],
-			},
-		});
-
-		client.on('qr', async (qr: string) => {
-			logger.info('QR Code received. Scan with WhatsApp.');
-			currentQR = qr;
-			isReady = false;
-
-			// También imprimir en terminal para desarrollo
-			qrcode.toString(qr, { type: 'terminal' }, (err, url) => {
-				if (!err) console.log(url);
-			});
-		});
-
-		client.on('ready', () => {
-			logger.info('WhatsApp is ready!');
-			isReady = true;
-			currentQR = null;
-		});
-
-		client.on('authenticated', () => {
-			logger.info('WhatsApp authenticated');
-			currentQR = null;
-		});
-
-		client.on('auth_failure', (msg: any) => {
-			logger.error({ msg }, 'WhatsApp authentication failed');
+		ev.on('qr.**', async (qrcode: string) => {
+			logger.info('QR Code received via event. Scan with WhatsApp.');
+			currentQR = qrcode;
 			isReady = false;
 		});
 
-		client.on('disconnected', async (reason: any) => {
-			logger.warn({ reason }, 'WhatsApp disconnected. Reinitializing...');
-			isReady = false;
-			currentQR = null;
-			whatsappClient = null;
-			isReconnecting = true;
-
-			setTimeout(async () => {
-				logger.info('Attempting to reconnect WhatsApp...');
-				await initWhatsApp(true);
-				isReconnecting = false;
-			}, 2000);
+		const client = await create({
+			sessionId: 'nexia-crm-client',
+			multiDevice: true,
+			executablePath: chromePath,
+			headless: 'new' as any,
+			qrTimeout: 0,
+			authTimeout: 0,
+			killProcessOnBrowserClose: true,
+			autoRefresh: true,
+			safeMode: true,
+			disableSpins: true,
+			popup: 3012,
+			defaultViewport: null,
+			logConsole: true,
 		});
 
-		client.on('change_state', (state: string) => {
-			logger.info({ state }, 'WhatsApp state changed');
-		});
+		whatsappClient = client;
+		isReady = true;
+		currentQR = null;
+		logger.info('WhatsApp is ready!');
 
-		// Keep-alive: enviar ping cada 30 segundos para mantener la conexión
-		setInterval(async () => {
-			if (client.info?.wid) {
-				try {
-					await client.pupPage.evaluate(() => {
-						return window.Store?.Msg?.collection?.length;
-					});
-					logger.debug('Keep-alive ping sent');
-				} catch {}
-			}
-		}, 30000);
-
-		// Conectar mensajes entrantes al handler
-		client.on('message', async (msg) => {
-			logger.info({ msgId: msg.id._serialized, from: msg.from }, 'Message event caught');
+		// Escuchar mensajes entrantes
+		client.onMessage(async (msg) => {
+			logger.info({ msgId: msg.id, from: msg.from }, 'Message event caught');
 			await handleIncomingMessage(msg);
 		});
 
-		client.on('message_create', (msg) => {
-			logger.info({ msgId: msg.id._serialized, fromMe: msg.fromMe }, 'Message created event');
+		// Manejar cambios de estado
+		client.onStateChanged((state) => {
+			logger.info({ state }, 'WhatsApp state changed');
+			if (state === 'CONNECTED') {
+				isReady = true;
+				currentQR = null;
+			} else if (state === 'CONFLICT' || state === 'UNLAUNCHED') {
+				isReady = false;
+			} else if (state === 'UNPAIRED') {
+				logger.warn('WhatsApp unpaired. Reinitializing...');
+				isReady = false;
+				currentQR = null;
+				reconnectWhatsApp();
+			}
 		});
 
-		await client.initialize();
-		whatsappClient = client;
 		return client;
 	} catch (error) {
 		const msg = error instanceof Error ? error.message : String(error);
@@ -160,7 +144,7 @@ export const sendMessage = async (to: string, message: string): Promise<void> =>
 		throw new Error('WhatsApp client not initialized');
 	}
 
-	// Normalizar el número de teléfono (eliminar cualquier formato anterior)
+	// Normalizar el número de teléfono
 	let phone = to;
 	if (phone.includes('@lid')) {
 		phone = phone.replace('@lid', '');
@@ -168,27 +152,51 @@ export const sendMessage = async (to: string, message: string): Promise<void> =>
 		phone = phone.replace('@c.us', '');
 	}
 
-	// Solo números, agregar código de país si falta
 	if (phone.length === 10) {
 		phone = '57' + phone;
 	}
 
+	const chatId = `${phone}@c.us` as ChatId;
 	logger.info({ originalTo: to, normalizedPhone: phone, chatId }, 'Sending WhatsApp message');
-	const chatId = `${phone}@c.us`;
-	await whatsappClient.sendMessage(chatId, message);
+	await whatsappClient.sendText(chatId, message);
 };
 
 export const reconnectWhatsApp = async (): Promise<boolean> => {
+	if (isReconnecting) {
+		logger.info('Reconnection already in progress, skipping duplicate call...');
+		return false;
+	}
+	isReconnecting = true;
+
 	try {
+		// 1. Intentar matar el cliente de forma segura
 		if (whatsappClient) {
-			await whatsappClient.destroy();
+			try {
+				await whatsappClient.kill();
+			} catch {
+				logger.warn('Error killing WA client gracefully, will force Chrome kill');
+			}
+			whatsappClient = null;
 		}
-		whatsappClient = null;
+
 		isReady = false;
 		currentQR = null;
-		isReconnecting = true;
 
+		// 2. Forzar cierre de cualquier proceso Chrome residual
+		killStaleChrome();
+
+		// 3. Esperar 3 segundos para que el OS libere archivos y locks
+		logger.info('Waiting 3s for browser to release locks...');
+		await sleep(3000);
+
+		// 4. Limpiar sesión y SingletonLock
 		await clearSession();
+
+		// 5. Esperar 1 segundo adicional antes de reiniciar
+		await sleep(1000);
+
+		// 6. Reiniciar el cliente
+		logger.info('Attempting to reconnect WhatsApp...');
 		await initWhatsApp(true);
 
 		setTimeout(() => {
