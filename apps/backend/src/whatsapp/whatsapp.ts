@@ -2,7 +2,8 @@ import makeWASocket, {
 	DisconnectReason,
 	useMultiFileAuthState,
 	WASocket,
-	fetchLatestBaileysVersion
+	fetchLatestWaWebVersion,
+	Browsers
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import fs from 'fs/promises';
@@ -58,13 +59,13 @@ export const initWhatsApp = async (forceNewSession = false): Promise<WASocket | 
 		const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
 		// Obtener la versión de WhatsApp Web más reciente para evitar fallos de inicio de sesión ("no se pudo iniciar sesión")
-		let version: [number, number, number] = [2, 3000, 1017531287];
+		let version: [number, number, number] = [2, 3000, 1039904970];
 		try {
-			const { version: latestVersion, isLatest } = await fetchLatestBaileysVersion();
-			logger.info({ latestVersion, isLatest }, 'Fetched latest WhatsApp Web version from Baileys');
+			const { version: latestVersion, isLatest } = await fetchLatestWaWebVersion();
+			logger.info({ latestVersion, isLatest }, 'Fetched latest WhatsApp Web version from WaWeb');
 			version = latestVersion;
 		} catch (err) {
-			logger.warn({ err }, 'Failed to fetch latest Baileys version, using fallback version');
+			logger.warn({ err }, 'Failed to fetch latest WaWeb version, using fallback version');
 		}
 
 		const dummyLogger = {
@@ -82,6 +83,7 @@ export const initWhatsApp = async (forceNewSession = false): Promise<WASocket | 
 			version,
 			printQRInTerminal: true,
 			logger: dummyLogger as any,
+			browser: Browsers.macOS('Desktop'),
 		});
 
 		sock = client;
