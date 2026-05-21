@@ -39,11 +39,11 @@ export const registerLidMapping = async (lid: string, pn: string) => {
 			
 			// Actualizar en segundo plano en la BD de Prisma
 			try {
-				const contact = await prisma.contact.findUnique({
+				const contact = await (prisma.contact as any).findUnique({
 					where: { phone: cleanLid }
 				});
-				if (contact && !contact.realPhone) {
-					await prisma.contact.update({
+				if (contact && !(contact as any).realPhone) {
+					await (prisma.contact as any).update({
 						where: { phone: cleanLid },
 						data: { realPhone: cleanPn }
 					});
@@ -133,12 +133,12 @@ export const resolvePhoneFromJid = async (jid: string): Promise<string> => {
  */
 export const backfillLidMappings = async (): Promise<void> => {
 	try {
-		const contacts = await prisma.contact.findMany({
+		const contacts = await (prisma.contact as any).findMany({
 			where: { realPhone: null },
 			select: { phone: true },
 		});
 
-		const candidates = contacts.map((c) => c.phone).filter((p) => /^\d{9,20}$/.test(p));
+		const candidates = contacts.map((c: any) => c.phone).filter((p: any) => /^\d{9,20}$/.test(p));
 
 		if (candidates.length === 0) return;
 
@@ -148,7 +148,7 @@ export const backfillLidMappings = async (): Promise<void> => {
 			// 1. Revisar mapa en memoria
 			const memPn = lidToPhone.get(lid);
 			if (memPn) {
-				await prisma.contact.update({ where: { phone: lid }, data: { realPhone: memPn } });
+				await (prisma.contact as any).update({ where: { phone: lid }, data: { realPhone: memPn } });
 				logger.info({ lid, realPhone: memPn }, 'Backfill: realPhone set from memory');
 				continue;
 			}
@@ -164,7 +164,7 @@ export const backfillLidMappings = async (): Promise<void> => {
 						const cleanPn = String(raw).replace(/@s\.whatsapp\.net|@c\.us|@lid/g, '').trim();
 						if (cleanPn && cleanPn !== lid) {
 							lidToPhone.set(lid, cleanPn);
-							await prisma.contact.update({ where: { phone: lid }, data: { realPhone: cleanPn } });
+							await (prisma.contact as any).update({ where: { phone: lid }, data: { realPhone: cleanPn } });
 							logger.info({ lid, realPhone: cleanPn }, 'Backfill: realPhone set from auth-store');
 							resolved = true;
 						}
@@ -179,7 +179,7 @@ export const backfillLidMappings = async (): Promise<void> => {
 				const filePhone = await readLidFromFile(lid);
 				if (filePhone) {
 					lidToPhone.set(lid, filePhone);
-					await prisma.contact.update({ where: { phone: lid }, data: { realPhone: filePhone } });
+					await (prisma.contact as any).update({ where: { phone: lid }, data: { realPhone: filePhone } });
 					logger.info({ lid, realPhone: filePhone }, 'Backfill: realPhone set from file');
 				}
 			}

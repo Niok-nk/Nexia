@@ -63,7 +63,7 @@ export async function handleIncomingMessage(msg: WAMessage): Promise<void> {
 
 	try {
 		// 1. Upsert del contacto
-		const contact = await prisma.contact.upsert({
+		const contact = await (prisma.contact as any).upsert({
 			where: { phone },
 			update: {
 				...(realPhone !== phone ? { realPhone } : {})
