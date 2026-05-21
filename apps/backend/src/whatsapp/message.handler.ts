@@ -1,7 +1,7 @@
 import { WAMessage } from '@whiskeysockets/baileys';
 import prisma from '../db/index.js';
 import { orchestrator } from '../agents/orchestrator.js';
-import { sendMessage, getStatus } from './whatsapp.js';
+import { sendMessage, getStatus, resolvePhoneFromJid } from './whatsapp.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -32,15 +32,8 @@ export async function handleIncomingMessage(msg: WAMessage): Promise<void> {
 		return;
 	}
 
-	// Extraer número de teléfono correctamente (manejar formatos @s.whatsapp.net, @lid y @c.us)
-	let phone = remoteJid;
-	if (phone.includes('@s.whatsapp.net')) {
-		phone = phone.replace('@s.whatsapp.net', '');
-	} else if (phone.includes('@lid')) {
-		phone = phone.replace('@lid', '');
-	} else if (phone.includes('@c.us')) {
-		phone = phone.replace('@c.us', '');
-	}
+	// Extraer número de teléfono correctamente resolviendo JIDs de tipo LID a números de teléfono reales
+	const phone = await resolvePhoneFromJid(remoteJid);
 
 	// Extraer el texto del mensaje admitiendo diferentes formatos de mensaje de Baileys
 	const body = (

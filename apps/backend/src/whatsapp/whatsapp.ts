@@ -3,7 +3,8 @@ import makeWASocket, {
 	useMultiFileAuthState,
 	WASocket,
 	fetchLatestWaWebVersion,
-	Browsers
+	Browsers,
+	isLidUser
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import fs from 'fs/promises';
@@ -15,6 +16,63 @@ let sock: WASocket | null = null;
 let currentQR: string | null = null;
 let isReady = false;
 let isReconnecting = false;
+
+// Almacén en memoria para mapeos LID -> Phone Number (PN)
+const lidToPhone = new Map<string, string>();
+
+/**
+ * Registra un mapeo entre un LID y un número de teléfono (PN) en memoria
+ */
+export const registerLidMapping = (lid: string, pn: string) => {
+	if (!lid || !pn) return;
+	const cleanLid = lid.replace('@lid', '').trim();
+	const cleanPn = pn.replace('@s.whatsapp.net', '').replace('@c.us', '').trim();
+	if (cleanLid && cleanPn) {
+		lidToPhone.set(cleanLid, cleanPn);
+		logger.info({ lid: cleanLid, pn: cleanPn }, 'Registered LID to PN mapping');
+	}
+};
+
+/**
+ * Resuelve un JID (que puede ser de tipo LID) a un número de teléfono real limpio
+ */
+export const resolvePhoneFromJid = async (jid: string): Promise<string> => {
+	if (!jid) return '';
+	
+	if (isLidUser(jid)) {
+		const cleanLid = jid.replace('@lid', '').trim();
+		
+		// 1. Intentar obtener de la memoria
+		const memoryPhone = lidToPhone.get(cleanLid);
+		if (memoryPhone) {
+			logger.info({ jid, resolved: memoryPhone, source: 'memory' }, 'Resolved LID to PN');
+			return memoryPhone;
+		}
+		
+		// 2. Intentar consultar el almacén de claves (auth state keys)
+		if (sock?.authState?.keys) {
+			try {
+				const results = await sock.authState.keys.get('lid-mapping', [cleanLid]);
+				if (results && results[cleanLid]) {
+					const pn = results[cleanLid];
+					registerLidMapping(cleanLid, pn);
+					const cleanPn = pn.replace('@s.whatsapp.net', '').replace('@c.us', '').trim();
+					logger.info({ jid, resolved: cleanPn, source: 'auth-store' }, 'Resolved LID to PN');
+					return cleanPn;
+				}
+			} catch (err) {
+				logger.warn({ err, jid }, 'Failed to query lid-mapping from auth keys');
+			}
+		}
+		
+		// 3. Fallback: retornar el LID crudo
+		logger.warn({ jid }, 'LID could not be resolved to phone number, returning raw LID');
+		return cleanLid;
+	}
+	
+	return jid.replace(/@s\.whatsapp\.net|@c\.us/g, '').trim();
+};
+
 
 export type WAStatus = 'disconnected' | 'qr_pending' | 'connected';
 
@@ -83,6 +141,50 @@ export const initWhatsApp = async (forceNewSession = false, isInternalReconnect 
 
 		client.ev.on('creds.update', saveCreds);
 
+		// Eventos de mapeo LID a número de teléfono (PN)
+		client.ev.on('lid-mapping.update', (mapping) => {
+			if (mapping) {
+				registerLidMapping(mapping.lid, mapping.pn);
+			}
+		});
+
+		client.ev.on('messaging-history.set', (history) => {
+			if (history.lidPnMappings) {
+				for (const mapping of history.lidPnMappings) {
+					registerLidMapping(mapping.lid, mapping.pn);
+				}
+			}
+			if (history.contacts) {
+				for (const c of history.contacts) {
+					if (c.lid && c.phoneNumber) {
+						registerLidMapping(c.lid, c.phoneNumber);
+					} else if (c.id && isLidUser(c.id) && c.phoneNumber) {
+						registerLidMapping(c.id, c.phoneNumber);
+					}
+				}
+			}
+		});
+
+		client.ev.on('contacts.upsert', (contacts) => {
+			for (const c of contacts) {
+				if (c.lid && c.phoneNumber) {
+					registerLidMapping(c.lid, c.phoneNumber);
+				} else if (c.id && isLidUser(c.id) && c.phoneNumber) {
+					registerLidMapping(c.id, c.phoneNumber);
+				}
+			}
+		});
+
+		client.ev.on('contacts.update', (updates) => {
+			for (const u of updates) {
+				if (u.lid && u.phoneNumber) {
+					registerLidMapping(u.lid, u.phoneNumber);
+				} else if (u.id && isLidUser(u.id) && u.phoneNumber) {
+					registerLidMapping(u.id, u.phoneNumber);
+				}
+			}
+		});
+
 		client.ev.on('connection.update', async (update) => {
 			const { connection, lastDisconnect, qr } = update;
 			
@@ -149,23 +251,25 @@ export const sendMessage = async (to: string, message: string): Promise<void> =>
 		throw new Error('WhatsApp client not initialized');
 	}
 
-	// Normalizar el número de teléfono
-	let phone = to;
-	if (phone.includes('@lid')) {
-		phone = phone.replace('@lid', '');
-	} else if (phone.includes('@c.us')) {
-		phone = phone.replace('@c.us', '');
-	} else if (phone.includes('@s.whatsapp.net')) {
-		phone = phone.replace('@s.whatsapp.net', '');
-	}
+	const cleanTo = to.replace('@lid', '').replace('@s.whatsapp.net', '').replace('@c.us', '').trim();
+	
+	// Determinar si el destinatario es un LID (ej. cuenta nueva sin número de teléfono resuelto aún)
+	const isLid = to.includes('@lid') || (cleanTo.startsWith('158') && cleanTo.length >= 14);
 
-	if (phone.length === 10) {
-		phone = '57' + phone;
+	if (isLid) {
+		const jid = `${cleanTo}@lid`;
+		logger.info({ originalTo: to, jid }, 'Sending WhatsApp message to LID');
+		await sock.sendMessage(jid, { text: message });
+	} else {
+		let phone = cleanTo;
+		if (phone.length === 10) {
+			phone = '57' + phone;
+		}
+		
+		const jid = `${phone}@s.whatsapp.net`;
+		logger.info({ originalTo: to, normalizedPhone: phone, jid }, 'Sending WhatsApp message');
+		await sock.sendMessage(jid, { text: message });
 	}
-
-	const jid = `${phone}@s.whatsapp.net`;
-	logger.info({ originalTo: to, normalizedPhone: phone, jid }, 'Sending WhatsApp message');
-	await sock.sendMessage(jid, { text: message });
 };
 
 export const reconnectWhatsApp = async (forceNewSession = true): Promise<boolean> => {
