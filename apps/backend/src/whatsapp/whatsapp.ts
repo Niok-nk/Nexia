@@ -18,6 +18,9 @@ let currentQR: string | null = null;
 let isReady = false;
 let isReconnecting = false;
 
+// Directorio de autenticación de Baileys (definido aquí para uso en readLidFromFile y clearSession)
+const authDir = path.join(process.cwd(), '_IGNORE_baileys_auth');
+
 // Almacén en memoria para mapeos LID -> Phone Number (PN)
 const lidToPhone = new Map<string, string>();
 
@@ -54,6 +57,25 @@ export const registerLidMapping = async (lid: string, pn: string) => {
 };
 
 /**
+ * Lee el número de teléfono real de un LID directamente desde los archivos del auth-store de Baileys.
+ * Formato: _IGNORE_baileys_auth/lid-mapping-{lid}_reverse.json → contiene el número como string JSON
+ */
+const readLidFromFile = async (lid: string): Promise<string | null> => {
+	try {
+		const filePath = path.join(authDir, `lid-mapping-${lid}_reverse.json`);
+		const content = await fs.readFile(filePath, 'utf-8');
+		const pn = JSON.parse(content);
+		if (pn && typeof pn === 'string') {
+			const cleanPn = pn.replace(/@s\.whatsapp\.net|@c\.us|@lid/g, '').trim();
+			if (cleanPn && cleanPn !== lid) return cleanPn;
+		}
+	} catch {
+		// archivo no existe o formato inesperado
+	}
+	return null;
+};
+
+/**
  * Resuelve un JID (que puede ser de tipo LID) a un número de teléfono real limpio
  */
 export const resolvePhoneFromJid = async (jid: string): Promise<string> => {
@@ -69,23 +91,34 @@ export const resolvePhoneFromJid = async (jid: string): Promise<string> => {
 			return memoryPhone;
 		}
 		
-		// 2. Intentar consultar el almacén de claves (auth state keys)
+		// 2. Intentar con el auth-key-store usando la clave '{lid}_reverse' (formato real de Baileys)
 		if (sock?.authState?.keys) {
 			try {
-				const results = await sock.authState.keys.get('lid-mapping', [cleanLid]);
-				if (results && results[cleanLid]) {
-					const pn = results[cleanLid];
-					registerLidMapping(cleanLid, pn);
-					const cleanPn = pn.replace('@s.whatsapp.net', '').replace('@c.us', '').trim();
-					logger.info({ jid, resolved: cleanPn, source: 'auth-store' }, 'Resolved LID to PN');
-					return cleanPn;
+				const reverseKey = `${cleanLid}_reverse`;
+				const results = await sock.authState.keys.get('lid-mapping', [reverseKey, cleanLid]);
+				const raw = results?.[reverseKey] ?? results?.[cleanLid];
+				if (raw) {
+					const cleanPn = String(raw).replace(/@s\.whatsapp\.net|@c\.us|@lid/g, '').trim();
+					if (cleanPn && cleanPn !== cleanLid) {
+						await registerLidMapping(cleanLid, cleanPn);
+						logger.info({ jid, resolved: cleanPn, source: 'auth-store' }, 'Resolved LID to PN');
+						return cleanPn;
+					}
 				}
 			} catch (err) {
 				logger.warn({ err, jid }, 'Failed to query lid-mapping from auth keys');
 			}
 		}
+
+		// 3. Leer directamente el archivo del auth-store en disco
+		const filePhone = await readLidFromFile(cleanLid);
+		if (filePhone) {
+			await registerLidMapping(cleanLid, filePhone);
+			logger.info({ jid, resolved: filePhone, source: 'file' }, 'Resolved LID to PN from file');
+			return filePhone;
+		}
 		
-		// 3. Fallback: retornar el LID crudo
+		// 4. Fallback: retornar el LID crudo
 		logger.warn({ jid }, 'LID could not be resolved to phone number, returning raw LID');
 		return cleanLid;
 	}
@@ -95,7 +128,7 @@ export const resolvePhoneFromJid = async (jid: string): Promise<string> => {
 
 /**
  * Backfill: intenta resolver realPhone para todos los contactos que aún tienen null.
- * Consulta primero el mapa en memoria y luego el auth-key-store de Baileys.
+ * Consulta memoria, auth-key-store (clave '_reverse') y los archivos en disco.
  * Se llama al abrir conexión y tras recibir messaging-history.
  */
 export const backfillLidMappings = async (): Promise<void> => {
@@ -120,22 +153,34 @@ export const backfillLidMappings = async (): Promise<void> => {
 				continue;
 			}
 
-			// 2. Consultar auth-key-store
+			// 2. Consultar auth-key-store con clave '{lid}_reverse' (formato correcto de Baileys)
+			let resolved = false;
 			if (sock?.authState?.keys) {
 				try {
-					const results = await sock.authState.keys.get('lid-mapping', [lid]);
-					if (results && results[lid]) {
-						const cleanPn = String(results[lid])
-							.replace(/@s\.whatsapp\.net|@c\.us|@lid/g, '')
-							.trim();
+					const reverseKey = `${lid}_reverse`;
+					const results = await sock.authState.keys.get('lid-mapping', [reverseKey, lid]);
+					const raw = results?.[reverseKey] ?? results?.[lid];
+					if (raw) {
+						const cleanPn = String(raw).replace(/@s\.whatsapp\.net|@c\.us|@lid/g, '').trim();
 						if (cleanPn && cleanPn !== lid) {
 							lidToPhone.set(lid, cleanPn);
 							await prisma.contact.update({ where: { phone: lid }, data: { realPhone: cleanPn } });
 							logger.info({ lid, realPhone: cleanPn }, 'Backfill: realPhone set from auth-store');
+							resolved = true;
 						}
 					}
 				} catch (err) {
 					logger.warn({ err, lid }, 'Backfill: failed to query auth-store for lid');
+				}
+			}
+
+			// 3. Fallback: leer directamente el archivo del disco
+			if (!resolved) {
+				const filePhone = await readLidFromFile(lid);
+				if (filePhone) {
+					lidToPhone.set(lid, filePhone);
+					await prisma.contact.update({ where: { phone: lid }, data: { realPhone: filePhone } });
+					logger.info({ lid, realPhone: filePhone }, 'Backfill: realPhone set from file');
 				}
 			}
 		}
@@ -156,7 +201,6 @@ export const getCurrentQR = (): string | null => currentQR;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const authDir = path.join(process.cwd(), '_IGNORE_baileys_auth');
 
 /**
  * Limpia la sesión de Baileys eliminando el directorio de autenticación
