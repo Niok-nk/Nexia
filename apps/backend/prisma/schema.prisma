@@ -10,6 +10,7 @@ datasource db {
 model Contact {
   id        String    @id @default(cuid())
   phone     String    @unique
+  realPhone String?
   name      String?
   email     String?
   createdAt DateTime  @default(now())

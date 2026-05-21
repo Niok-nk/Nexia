@@ -32,8 +32,18 @@ export async function handleIncomingMessage(msg: WAMessage): Promise<void> {
 		return;
 	}
 
-	// Extraer número de teléfono correctamente resolviendo JIDs de tipo LID a números de teléfono reales
-	const phone = await resolvePhoneFromJid(remoteJid);
+	// 1. Extraer el identificador único del JID (el que dice telefono lo ponemos como id)
+	let phone = remoteJid;
+	if (phone.includes('@s.whatsapp.net')) {
+		phone = phone.replace('@s.whatsapp.net', '');
+	} else if (phone.includes('@lid')) {
+		phone = phone.replace('@lid', '');
+	} else if (phone.includes('@c.us')) {
+		phone = phone.replace('@c.us', '');
+	}
+
+	// 2. Intentar resolver el número de teléfono real
+	const realPhone = await resolvePhoneFromJid(remoteJid);
 
 	// Extraer el texto del mensaje admitiendo diferentes formatos de mensaje de Baileys
 	const body = (
@@ -49,14 +59,19 @@ export async function handleIncomingMessage(msg: WAMessage): Promise<void> {
 		return;
 	}
 
-	logger.info({ phone, body: body.slice(0, 80) }, 'Incoming WA message');
+	logger.info({ phone, realPhone, body: body.slice(0, 80) }, 'Incoming WA message');
 
 	try {
 		// 1. Upsert del contacto
 		const contact = await prisma.contact.upsert({
 			where: { phone },
-			update: {},
-			create: { phone },
+			update: {
+				...(realPhone !== phone ? { realPhone } : {})
+			},
+			create: { 
+				phone,
+				realPhone: realPhone !== phone ? realPhone : (phone.startsWith('158') && phone.length >= 14 ? null : phone)
+			},
 		});
 
 		// 2. Persistir mensaje INBOUND

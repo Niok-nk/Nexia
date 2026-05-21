@@ -10,6 +10,7 @@ import { Boom } from '@hapi/boom';
 import fs from 'fs/promises';
 import path from 'path';
 import logger from '../utils/logger.js';
+import prisma from '../db/index.js';
 import { handleIncomingMessage } from './message.handler.js';
 
 let sock: WASocket | null = null;
@@ -21,15 +22,34 @@ let isReconnecting = false;
 const lidToPhone = new Map<string, string>();
 
 /**
- * Registra un mapeo entre un LID y un número de teléfono (PN) en memoria
+ * Registra un mapeo entre un LID y un número de teléfono (PN) en memoria y base de datos
  */
-export const registerLidMapping = (lid: string, pn: string) => {
+export const registerLidMapping = async (lid: string, pn: string) => {
 	if (!lid || !pn) return;
 	const cleanLid = lid.replace('@lid', '').trim();
 	const cleanPn = pn.replace('@s.whatsapp.net', '').replace('@c.us', '').trim();
 	if (cleanLid && cleanPn) {
-		lidToPhone.set(cleanLid, cleanPn);
-		logger.info({ lid: cleanLid, pn: cleanPn }, 'Registered LID to PN mapping');
+		const existing = lidToPhone.get(cleanLid);
+		if (existing !== cleanPn) {
+			lidToPhone.set(cleanLid, cleanPn);
+			logger.info({ lid: cleanLid, pn: cleanPn }, 'Registered LID to PN mapping');
+			
+			// Actualizar en segundo plano en la BD de Prisma
+			try {
+				const contact = await prisma.contact.findUnique({
+					where: { phone: cleanLid }
+				});
+				if (contact && !contact.realPhone) {
+					await prisma.contact.update({
+						where: { phone: cleanLid },
+						data: { realPhone: cleanPn }
+					});
+					logger.info({ lid: cleanLid, realPhone: cleanPn }, 'Updated contact realPhone in DB');
+				}
+			} catch (err) {
+				logger.error({ err, lid: cleanLid }, 'Failed to update contact realPhone in DB');
+			}
+		}
 	}
 };
 
