@@ -42,8 +42,8 @@ const clearSession = async (): Promise<void> => {
 	}
 };
 
-export const initWhatsApp = async (forceNewSession = false): Promise<WASocket | null> => {
-	if (isReconnecting && !forceNewSession) {
+export const initWhatsApp = async (forceNewSession = false, isInternalReconnect = false): Promise<WASocket | null> => {
+	if (isReconnecting && !forceNewSession && !isInternalReconnect) {
 		logger.info('Reconnection already in progress, skipping...');
 		return null;
 	}
@@ -200,7 +200,7 @@ export const reconnectWhatsApp = async (forceNewSession = true): Promise<boolean
 		await sleep(1000);
 
 		logger.info('Attempting to reconnect WhatsApp...');
-		await initWhatsApp(forceNewSession);
+		await initWhatsApp(forceNewSession, true);
 
 		setTimeout(() => {
 			isReconnecting = false;
