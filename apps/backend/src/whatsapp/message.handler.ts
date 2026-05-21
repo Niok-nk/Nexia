@@ -1,4 +1,4 @@
-import { Message } from '@open-wa/wa-automate';
+import { WAMessage } from '@whiskeysockets/baileys';
 import prisma from '../db/index.js';
 import { orchestrator } from '../agents/orchestrator.js';
 import { sendMessage, getStatus } from './whatsapp.js';
@@ -14,29 +14,42 @@ import logger from '../utils/logger.js';
  * 6. Actualiza el Lead con la etapa y módulo correctos
  * 7. Envía la respuesta por WhatsApp
  */
-export async function handleIncomingMessage(msg: Message): Promise<void> {
-	logger.info({ msgFrom: msg.from, msgFromMe: msg.fromMe }, 'Message event received');
+export async function handleIncomingMessage(msg: WAMessage): Promise<void> {
+	const remoteJid = msg.key.remoteJid || '';
+	const fromMe = !!msg.key.fromMe;
+
+	logger.info({ msgFrom: remoteJid, msgFromMe: fromMe }, 'Message event received');
 
 	// Ignorar mensajes del propio número
-	if (msg.fromMe) {
+	if (fromMe) {
 		logger.info('Ignoring message fromMe');
 		return;
 	}
+	
 	// Ignorar mensajes de grupos
-	if (msg.from.endsWith('@g.us')) {
+	if (remoteJid.endsWith('@g.us')) {
 		logger.info('Ignoring group message');
 		return;
 	}
 
-	// Extraer número de teléfono correctamente (manejar formato lid y c.us)
-	let phone: string = msg.from;
-	if (phone.includes('@lid')) {
-		// Formato legacy: 212519343923373@lid -> extraer solo números
+	// Extraer número de teléfono correctamente (manejar formatos @s.whatsapp.net, @lid y @c.us)
+	let phone = remoteJid;
+	if (phone.includes('@s.whatsapp.net')) {
+		phone = phone.replace('@s.whatsapp.net', '');
+	} else if (phone.includes('@lid')) {
 		phone = phone.replace('@lid', '');
 	} else if (phone.includes('@c.us')) {
 		phone = phone.replace('@c.us', '');
 	}
-	const body = msg.body?.trim();
+
+	// Extraer el texto del mensaje admitiendo diferentes formatos de mensaje de Baileys
+	const body = (
+		msg.message?.conversation ||
+		msg.message?.extendedTextMessage?.text ||
+		msg.message?.imageMessage?.caption ||
+		msg.message?.videoMessage?.caption ||
+		''
+	).trim();
 
 	if (!body) {
 		logger.warn({ phone }, 'Empty message body, ignoring');
