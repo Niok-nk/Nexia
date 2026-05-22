@@ -265,6 +265,7 @@ export async function processIncomingMessage(
 	const extra = userData.extra ?? null;
 	if (extra?.flujo && typeof extra.flujo === 'string') context.flujo = extra.flujo;
 	if (extra?.pendingMessage) context.pendingMessage = extra.pendingMessage;
+	if (extra?.ultimaBusqueda) context.ultimaBusqueda = extra.ultimaBusqueda;
 
 	// 6. Enrutar al orquestador
 	const { agentType, response, metadata } = await orchestrator.route(body, context);
