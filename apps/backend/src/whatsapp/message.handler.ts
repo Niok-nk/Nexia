@@ -121,195 +121,12 @@ export async function handleIncomingMessage(msg: WAMessage): Promise<void> {
 	logger.info({ phone, realPhone, body: body.slice(0, 80) }, 'Incoming WA message');
 
 	try {
-		// 1. Upsert del contacto
-		const contact = await (prisma.contact as any).upsert({
-			where: { phone },
-			update: {
-				...(realPhone !== phone ? { realPhone } : {})
-			},
-			create: { 
-				phone,
-				realPhone: realPhone !== phone ? realPhone : (phone.startsWith('158') && phone.length >= 14 ? null : phone)
-			},
-		});
-
-		// 2. Persistir mensaje INBOUND
-		await prisma.message.create({
-			data: {
-				contactId: contact.id,
-				direction: 'INBOUND',
-				body,
-			},
-		});
-
-		// 3. Obtener historial reciente (últimos 10 mensajes)
-		const history = await prisma.message.findMany({
-			where: { contactId: contact.id },
-			orderBy: { sentAt: 'desc' },
-			take: 10,
-		});
-
-		// 4. Lead activo del contacto (el más reciente)
-		let lead = await prisma.lead.findFirst({
-			where: { contactId: contact.id },
-			orderBy: { createdAt: 'desc' },
-		});
-
-		// 5. Cargar UserData persistido (datos recolectados por la IA progresivamente)
-		let userDataRecord = lead
-			? await prisma.userData.findUnique({ where: { leadId: lead.id } })
-			: null;
-
-		const userData = {
-			ciudad: userDataRecord?.ciudad ?? null,
-			departamento: userDataRecord?.departamento ?? null,
-			nombre: userDataRecord?.nombre ?? null,
-			cedula: userDataRecord?.cedula ?? null,
-			productoSolicitado: userDataRecord?.productoSolicitado ?? null,
-			extra: safeParseJson(userDataRecord?.extra),
-		};
-
-		// Intentar extraer ciudad y departamento directamente del mensaje actual
-		const { ciudad: ciudadDelMensaje, departamento: deptoDelMensaje } = extraerUbicacion(body);
-		if (ciudadDelMensaje && !userData.ciudad) {
-			userData.ciudad = ciudadDelMensaje;
-		}
-		if (deptoDelMensaje && !userData.departamento) {
-			userData.departamento = deptoDelMensaje;
-		}
-
-		// Guardar en UserData INMEDIATAMENTE si se detectó ubicación y el lead existe
-		if (lead && (ciudadDelMensaje || deptoDelMensaje)) {
-			const saveData: Record<string, any> = {};
-			if (ciudadDelMensaje && !userDataRecord?.ciudad) saveData.ciudad = ciudadDelMensaje;
-			if (deptoDelMensaje && !userDataRecord?.departamento) saveData.departamento = deptoDelMensaje;
-			if (Object.keys(saveData).length > 0) {
-				await prisma.userData.upsert({
-					where: { leadId: lead.id },
-					update: saveData,
-					create: { leadId: lead.id, ...saveData },
-				}).catch(e => logger.error({ error: e.message }, 'Failed to save location to UserData'));
-			}
-		}
-
-		const context: Record<string, any> = {
-			contactId: contact.id,
-			phone,
-			leadId: lead?.id,
-			stage: lead?.stage ?? 'INITIAL',
-			module: lead?.module ?? 'VENTAS',
-			history: history.reverse().map((m) => ({
-				direction: m.direction,
-				body: m.body,
-				sentAt: m.sentAt,
-			})),
-			userData,
-		};
-
-		// Si ya tenemos ciudad guardada, pre-poblamos el contexto
-		// para que los agentes no vuelvan a preguntar
-		if (userData.ciudad) {
-			context.ciudad = userData.ciudad;
-			context.ciudadValidada = true;
-		}
-
-		// Restaurar flujo y pendingMessage desde UserData.extra
-		// para que el agente sepa que estábamos esperando ciudad/producto/etc.
-		const extra = userData.extra ?? null;
-		if (extra?.flujo) context.flujo = extra.flujo;
-		if (extra?.pendingMessage) context.pendingMessage = extra.pendingMessage;
-
-		// 6. Enrutar al orquestador
-		const { agentType, response, metadata } = await orchestrator.route(body, context);
-
-		// 7. Persistir respuesta OUTBOUND
-		await prisma.message.create({
-			data: {
-				contactId: contact.id,
-				direction: 'OUTBOUND',
-				body: response,
-				agentType,
-			},
-		});
-
-		// 8. Crear o actualizar lead
-		const moduleMap: Record<string, string> = {
-			ventas: 'VENTAS',
-			cartera: 'CARTERA',
-			servicio_tecnico: 'SERVICIO_TECNICO',
-			repuestos: 'REPUESTOS',
-			vacantes: 'VACANTES',
-			distribuidores: 'DISTRIBUIDORES',
-			pagos: 'MEDIOS_DE_PAGO',
-		};
-
-		const crmModule = moduleMap[agentType] ?? 'VENTAS';
-
-		if (!lead) {
-			lead = await prisma.lead.create({
-				data: {
-					contactId: contact.id,
-					stage: 'INITIAL',
-					type: 'CONSULTA',
-					module: crmModule,
-				},
-			});
-		} else if (lead.module !== crmModule) {
-			// Si el módulo cambió, el orquestador reasignó al contacto
-			lead = await prisma.lead.update({
-				where: { id: lead.id },
-				data: { module: crmModule },
-			});
-		}
-
-		// 9. Guardar datos recolectados por la IA en UserData
-		if (lead) {
-			const ud: Record<string, any> = {};
-
-			// Prioridad: metadata del agente > detección directa del mensaje > UserData previo
-			if (metadata?.ciudad) {
-				ud.ciudad = metadata.ciudad;
-			} else if (userData.ciudad && userData.ciudad !== userDataRecord?.ciudad) {
-				ud.ciudad = userData.ciudad;
-			}
-			if (metadata?.departamento) {
-				ud.departamento = metadata.departamento;
-			} else if (userData.departamento && userData.departamento !== userDataRecord?.departamento) {
-				ud.departamento = userData.departamento;
-			}
-
-			const credito = metadata?.creditoData;
-			if (credito?.nombres) ud.nombre = credito.nombres;
-			if (credito?.cedula) ud.cedula = credito.cedula;
-			if (credito?.producto) ud.productoSolicitado = credito.producto;
-
-			const repuesto = metadata?.repuestoData;
-			if (repuesto?.nombreCliente) ud.nombre = repuesto.nombreCliente;
-			if (repuesto?.repuesto) ud.productoSolicitado = repuesto.repuesto;
-
-			const extra = { ...safeParseJson(userDataRecord?.extra) };
-			const mergedExtra = { ...extra, ...metadata };
-			const udHasData = Object.keys(ud).length > 0;
-
-			if (udHasData) {
-				await prisma.userData.upsert({
-					where: { leadId: lead.id },
-					update: { ...ud, extra: JSON.stringify(mergedExtra) },
-					create: { leadId: lead.id, ...ud, extra: JSON.stringify(mergedExtra) },
-				});
-			} else if (metadata) {
-				await prisma.userData.upsert({
-					where: { leadId: lead.id },
-					update: { extra: JSON.stringify(mergedExtra) },
-					create: { leadId: lead.id, extra: JSON.stringify(mergedExtra) },
-				});
-			}
-		}
+		const { response, agentType } = await processIncomingMessage(phone, body, realPhone);
 
 		// 10. Enviar respuesta por WhatsApp solo si está conectado
 		if (getStatus() === 'connected') {
 			await sendMessage(phone, response);
-			logger.info({ phone, agentType, leadId: lead.id }, 'Response sent');
+			logger.info({ phone, agentType }, 'Response sent');
 		} else {
 			logger.warn({ phone, agentType }, 'WhatsApp not connected, response not sent');
 		}
@@ -342,4 +159,197 @@ export async function handleIncomingMessage(msg: WAMessage): Promise<void> {
 			}
 		}
 	}
+}
+
+export async function processIncomingMessage(
+	phone: string,
+	body: string,
+	realPhone: string | null = null
+): Promise<{ response: string; agentType: string }> {
+	// 1. Upsert del contacto
+	const contact = await (prisma.contact as any).upsert({
+		where: { phone },
+		update: {
+			...(realPhone !== phone ? { realPhone } : {})
+		},
+		create: { 
+			phone,
+			realPhone: realPhone !== phone ? realPhone : (phone.startsWith('158') && phone.length >= 14 ? null : phone)
+		},
+	});
+
+	// 2. Persistir mensaje INBOUND
+	await prisma.message.create({
+		data: {
+			contactId: contact.id,
+			direction: 'INBOUND',
+			body,
+		},
+	});
+
+	// 3. Obtener historial reciente (últimos 10 mensajes)
+	const history = await prisma.message.findMany({
+		where: { contactId: contact.id },
+		orderBy: { sentAt: 'desc' },
+		take: 10,
+	});
+
+	// 4. Lead activo del contacto (el más reciente)
+	let lead = await prisma.lead.findFirst({
+		where: { contactId: contact.id },
+		orderBy: { createdAt: 'desc' },
+	});
+
+	// 5. Cargar UserData persistido (datos recolectados por la IA progresivamente)
+	let userDataRecord = lead
+		? await prisma.userData.findUnique({ where: { leadId: lead.id } })
+		: null;
+
+	const userData = {
+		ciudad: userDataRecord?.ciudad ?? null,
+		departamento: userDataRecord?.departamento ?? null,
+		nombre: userDataRecord?.nombre ?? null,
+		cedula: userDataRecord?.cedula ?? null,
+		productoSolicitado: userDataRecord?.productoSolicitado ?? null,
+		extra: safeParseJson(userDataRecord?.extra),
+	};
+
+	// Intentar extraer ciudad y departamento directamente del mensaje actual
+	const { ciudad: ciudadDelMensaje, departamento: deptoDelMensaje } = extraerUbicacion(body);
+	if (ciudadDelMensaje && !userData.ciudad) {
+		userData.ciudad = ciudadDelMensaje;
+	}
+	if (deptoDelMensaje && !userData.departamento) {
+		userData.departamento = deptoDelMensaje;
+	}
+
+	// Guardar en UserData INMEDIATAMENTE si se detectó ubicación y el lead existe
+	if (lead && (ciudadDelMensaje || deptoDelMensaje)) {
+		const saveData: Record<string, any> = {};
+		if (ciudadDelMensaje && !userDataRecord?.ciudad) saveData.ciudad = ciudadDelMensaje;
+		if (deptoDelMensaje && !userDataRecord?.departamento) saveData.departamento = deptoDelMensaje;
+		if (Object.keys(saveData).length > 0) {
+			await prisma.userData.upsert({
+				where: { leadId: lead.id },
+				update: saveData,
+				create: { leadId: lead.id, ...saveData },
+			}).catch(e => logger.error({ error: e.message }, 'Failed to save location to UserData'));
+		}
+	}
+
+	const context: Record<string, any> = {
+		contactId: contact.id,
+		phone,
+		leadId: lead?.id,
+		stage: lead?.stage ?? 'INITIAL',
+		module: lead?.module ?? 'VENTAS',
+		history: history.reverse().map((m) => ({
+			direction: m.direction,
+			body: m.body,
+			sentAt: m.sentAt,
+		})),
+		userData,
+	};
+
+	// Si ya tenemos ciudad guardada, pre-poblamos el contexto
+	// para que los agentes no vuelvan a preguntar
+	if (userData.ciudad) {
+		context.ciudad = userData.ciudad;
+		context.ciudadValidada = true;
+	}
+
+	// Restaurar flujo y pendingMessage desde UserData.extra
+	// para que el agente sepa que estábamos esperando ciudad/producto/etc.
+	const extra = userData.extra ?? null;
+	if (extra?.flujo) context.flujo = extra.flujo;
+	if (extra?.pendingMessage) context.pendingMessage = extra.pendingMessage;
+
+	// 6. Enrutar al orquestador
+	const { agentType, response, metadata } = await orchestrator.route(body, context);
+
+	// 7. Persistir respuesta OUTBOUND
+	await prisma.message.create({
+		data: {
+			contactId: contact.id,
+			direction: 'OUTBOUND',
+			body: response,
+			agentType,
+		},
+	});
+
+	// 8. Crear o actualizar lead
+	const moduleMap: Record<string, string> = {
+		ventas: 'VENTAS',
+		cartera: 'CARTERA',
+		servicio_tecnico: 'SERVICIO_TECNICO',
+		repuestos: 'REPUESTOS',
+		vacantes: 'VACANTES',
+		distribuidores: 'DISTRIBUIDORES',
+		pagos: 'MEDIOS_DE_PAGO',
+	};
+
+	const crmModule = moduleMap[agentType] ?? 'VENTAS';
+
+	if (!lead) {
+		lead = await prisma.lead.create({
+			data: {
+				contactId: contact.id,
+				stage: 'INITIAL',
+				type: 'CONSULTA',
+				module: crmModule,
+			},
+		});
+	} else if (lead.module !== crmModule) {
+		// Si el módulo cambió, el orquestador reasignó al contacto
+		lead = await prisma.lead.update({
+			where: { id: lead.id },
+			data: { module: crmModule },
+		});
+	}
+
+	// 9. Guardar datos recolectados por la IA en UserData
+	if (lead) {
+		const ud: Record<string, any> = {};
+
+		// Prioridad: metadata del agente > detección directa del mensaje > UserData previo
+		if (metadata?.ciudad) {
+			ud.ciudad = metadata.ciudad;
+		} else if (userData.ciudad && userData.ciudad !== userDataRecord?.ciudad) {
+			ud.ciudad = userData.ciudad;
+		}
+		if (metadata?.departamento) {
+			ud.departamento = metadata.departamento;
+		} else if (userData.departamento && userData.departamento !== userDataRecord?.departamento) {
+			ud.departamento = userData.departamento;
+		}
+
+		const credito = metadata?.creditoData;
+		if (credito?.nombres) ud.nombre = credito.nombres;
+		if (credito?.cedula) ud.cedula = credito.cedula;
+		if (credito?.producto) ud.productoSolicitado = credito.producto;
+
+		const repuesto = metadata?.repuestoData;
+		if (repuesto?.nombreCliente) ud.nombre = repuesto.nombreCliente;
+		if (repuesto?.repuesto) ud.productoSolicitado = repuesto.repuesto;
+
+		const extra = { ...safeParseJson(userDataRecord?.extra) };
+		const mergedExtra = { ...extra, ...metadata };
+		const udHasData = Object.keys(ud).length > 0;
+
+		if (udHasData) {
+			await prisma.userData.upsert({
+				where: { leadId: lead.id },
+				update: { ...ud, extra: JSON.stringify(mergedExtra) },
+				create: { leadId: lead.id, ...ud, extra: JSON.stringify(mergedExtra) },
+			});
+		} else if (metadata) {
+			await prisma.userData.upsert({
+				where: { leadId: lead.id },
+				update: { extra: JSON.stringify(mergedExtra) },
+				create: { leadId: lead.id, extra: JSON.stringify(mergedExtra) },
+			});
+		}
+	}
+
+	return { response, agentType, contactId: contact.id, leadId: lead?.id };
 }
