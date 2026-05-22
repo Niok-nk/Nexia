@@ -901,7 +901,7 @@ export class VentasAgent implements IAgent {
 		}
 
 		// ── PASO 4: Detectar intención de compra ─────────────────────────────
-		const quiereComprar = /\b(?:comprar|lo quiero|la quiero|quiero esa|quiero este|c[oó]mo compro|c[oó]mo hago|quiero pagar|proceder|concretar|compralo|c[oó]mpralo|reservar|apartar)\b/i.test(message);
+		const quiereComprar = /\b(?:comprar(?:lo|la)?|lo quiero|la quiero|quiero esa|quiero este|quiero comprar|c[oó]mo (?:compro|hago|puedo pagar|le hago|le hago para pagar)|quiero pagar|proceder|concretar|compralo|c[oó]mpralo|reservar|apartar|d[áa]le|confirmo compra|ya lo quiero)\b|\bcompr(?:o|ar)\s+(?:esa|este|ese)\b/i.test(message);
 
 		if (quiereComprar && context?.modalidad === 'contado') {
 			const tieneCobertura = context?.tieneCobertura;
@@ -922,12 +922,82 @@ export class VentasAgent implements IAgent {
 			};
 		}
 
+		// ── PASO 4b: Consulta genérica sobre cómo pagar ─────────────────────
+		const preguntaPago = /\b(?:c[oó]mo (?:pagar|puedo pagar|hago para pagar)|medios de pago|formas de pago|d[oó]nde pago|puedo pagar)\b/i.test(message);
+		if (preguntaPago && context?.modalidad === 'contado' && !context?.flujo?.startsWith('pago_') && context?.flujo !== 'seleccion_pago') {
+			const tieneCobertura = context?.tieneCobertura;
+			return {
+				response: `Claro, estas son las opciones:\n1️⃣ Medios de pago autorizados\n2️⃣ Paga directamente en nuestra página web${tieneCobertura ? '\n3️⃣ Paga en un punto físico' : ''}\n¿Cuál prefieres?`,
+				metadata: {
+					agentType: 'ventas',
+					flujo: 'seleccion_pago',
+					modalidad: 'contado',
+					ciudad: context?.ciudad,
+					ciudadValidada: true,
+					tieneCobertura,
+				},
+			};
+		}
+
+		// ── PASO 4c: Seguimiento paso a paso para pago web ──────────────────
+		if (context?.flujo === 'pago_web_paso') {
+			const pasoActual = context?.pasoWeb ?? 1;
+			const pasos = [
+				'Añade el producto al carrito de compras.',
+				'Ve al carrito o presiona directamente el botón "Comprar".',
+				'Rellena todos tus datos de envío y pago.',
+				'Realiza el pago a través de Wompi y listo, ¡ya quedó!',
+			];
+			if (pasoActual <= pasos.length) {
+				const pasoMsg = `Paso ${pasoActual}: ${pasos[pasoActual - 1]}`;
+				const siguiente = pasoActual < pasos.length
+					? '\n\nCuando termines, dime "listo" para continuar con el siguiente paso.'
+					: '\n\n¿Lograste completar el pago?';
+				return {
+					response: pasoMsg + siguiente,
+					metadata: {
+						agentType: 'ventas',
+						flujo: pasoActual < pasos.length ? 'pago_web_paso' : 'pago_completado',
+						pasoWeb: pasoActual + 1,
+						ciudad: context?.ciudad,
+						ciudadValidada: true,
+					},
+				};
+			}
+		}
+
+		if (context?.flujo === 'pago_web') {
+			const quiereAyuda = /\bs[íi]\b|sip|dale|ok|bueno|claro|si gracias|si por favor/i.test(lower);
+			if (quiereAyuda) {
+				return {
+					response: `Paso 1: Añade el producto al carrito de compras.\n\nCuando termines, dime "listo" para continuar con el siguiente paso.`,
+					metadata: {
+						agentType: 'ventas',
+						flujo: 'pago_web_paso',
+						pasoWeb: 2,
+						ciudad: context?.ciudad,
+						ciudadValidada: true,
+					},
+				};
+			}
+			// No quiere ayuda
+			return {
+				response: `Perfecto, cualquier duda me avisas. 😊`,
+				metadata: {
+					agentType: 'ventas',
+					flujo: null,
+					ciudad: context?.ciudad,
+					ciudadValidada: true,
+				},
+			};
+		}
+
 		// ── PASO 5: Flujo de selección de pago ──────────────────────────────
 		if (context?.flujo === 'seleccion_pago') {
 			const opcion = message.trim();
 			if (/1|medios de pago|medios autorizados/i.test(opcion)) {
 				return {
-					response: 'Aquí tienes los medios de pago autorizados. ¿Cuál prefieres utilizar?',
+					response: `Estos son nuestros medios de pago autorizados:\nhttps://jlc-electronics.com/wp-content/uploads/2026/05/Medios_de_pago.jpeg\n\n¿Con cuál deseas pagar?`,
 					metadata: {
 						agentType: 'ventas',
 						flujo: 'pago_medios',
@@ -938,7 +1008,7 @@ export class VentasAgent implements IAgent {
 			}
 			if (/2|p[aá]gina web|web|en l[íi]nea|online/i.test(opcion)) {
 				return {
-					response: `Puedes pagar directamente en nuestra página: https://jlc-electronics.com/\n¿Quieres que te acompañe paso a paso con el proceso?`,
+					response: `Puedes pagar directamente en nuestra página:\nhttps://jlc-electronics.com/\n\n¿Quieres que te acompañe paso a paso con el proceso?`,
 					metadata: {
 						agentType: 'ventas',
 						flujo: 'pago_web',
