@@ -213,6 +213,9 @@ export async function processIncomingMessage(
 		nombre: userDataRecord?.nombre ?? null,
 		cedula: userDataRecord?.cedula ?? null,
 		productoSolicitado: userDataRecord?.productoSolicitado ?? null,
+		direccion: userDataRecord?.direccion ?? null,
+		telefono: userDataRecord?.telefono ?? null,
+		presupuesto: userDataRecord?.presupuesto ?? null,
 		extra: safeParseJson(userDataRecord?.extra),
 	};
 
@@ -334,6 +337,15 @@ export async function processIncomingMessage(
 		const repuesto = metadata?.repuestoData;
 		if (repuesto?.nombreCliente) ud.nombre = repuesto.nombreCliente;
 		if (repuesto?.repuesto) ud.productoSolicitado = repuesto.repuesto;
+
+		if (metadata?.productoCompra) ud.productoSolicitado = metadata.productoCompra;
+
+		// Datos personales continuos (nombre, cédula, dirección, teléfono, presupuesto)
+		if (metadata?.nombreCliente) ud.nombre = metadata.nombreCliente;
+		if (metadata?.cedulaCliente) ud.cedula = metadata.cedulaCliente;
+		if (metadata?.direccion) ud.direccion = metadata.direccion;
+		if (metadata?.telefono) ud.telefono = metadata.telefono;
+		if (metadata?.presupuesto) ud.presupuesto = metadata.presupuesto;
 
 		const extra = { ...safeParseJson(userDataRecord?.extra) };
 		const mergedExtra = { ...extra, ...metadata };

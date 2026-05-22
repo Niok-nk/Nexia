@@ -102,7 +102,14 @@ function cleanResponse(raw: string): string {
 		if (result.length > 10) text = result;
 	}
 
-	// 5) Cortar listas de "User Role:", "Client Goal:", etc.
+	// 5) Quitar auto-verificación tipo "Checking constraints: ..." y "Option N: ..."
+	text = text.replace(/^Checking\s+constraints:[\s\S]*?(?=\n(?:Sí|¡Claro|Tenemos|Esa|La|Perfecto|\d+\.|[\wÁÉÍÓÚÑ]))/i, '').trim();
+	text = text.replace(/^(?:Option|Opción)\s+\d+\s*:\s*[^\n]*/im, '').trim();
+	text = text.replace(/\n(?:Option|Opción)\s+\d+\s*:\s*[^\n]*/gi, '').trim();
+	text = text.replace(/\d+\s*lines?\s*max\??\s*:\s*yes|no|sí|si/gi, '').trim();
+	text = text.replace(/(?:max|máx)\s*\d+\s*(?:lines|palabras|productos)\??\s*\??\s*(?:yes|no|sí|si)/gi, '').trim();
+
+	// 6) Cortar listas de "User Role:", "Client Goal:", etc.
 	const labelRe = /(?:^|[\s.])(?:user role|client goal|customer goal|customer's current request|customer current request|context(?:\s+from\s+previous\s+examples)?|reference info|style|i need to know|the customer is interested|the draft|following the examples)\s*:?/gi;
 	const labelMatches = [...text.matchAll(labelRe)];
 	if (labelMatches.length > 0) {
@@ -718,19 +725,6 @@ export class VentasAgent implements IAgent {
 		};
 	}
 
-	// ── Flujo sin cobertura ───────────────────────────────────────────────────
-	// Mejora #3: informar condiciones y preguntar si desea continuar
-	private manejarSinCobertura(ciudad: string): AgentResponse {
-		return {
-			response: `Revisé tu ubicación (${ciudad}) y en este momento no tenemos cobertura con envío directo en esa zona.\n\nSin embargo, puedes comprar de *contado* y el envío se hace por transportadora *Coordinadora* (el flete corre por tu cuenta).\n\n¿Deseas continuar con esa modalidad? Responde *Sí* para seguir o *No* si prefieres esperar a que lleguemos a tu ciudad. 😊`,
-			metadata: {
-				agentType: 'ventas',
-				flujo: 'sin_cobertura',
-				ciudad,
-			},
-		};
-	}
-
 	// ── Handle principal ──────────────────────────────────────────────────────
 	async handle(message: string, context: any): Promise<AgentResponse> {
 		const lower = message.toLowerCase().trim();
@@ -738,21 +732,6 @@ export class VentasAgent implements IAgent {
 		// ── Flujo de crédito activo ────────────────────────────────────────────
 		if (context?.flujo === 'credito') {
 			return this.manejarFlujoCredito(message, context);
-		}
-
-		// ── Cliente decidió NO continuar sin cobertura (mejora #3) ────────────
-		if (context?.flujo === 'sin_cobertura') {
-			const noQuiere = /\bno\b|no gracias|no quiero|no por ahora|prefiero no/i.test(lower);
-			if (noQuiere) {
-				return {
-					response: `Entendido, no hay problema. Cuando JLC tenga cobertura en tu ciudad te podremos atender con todas las opciones. ¡Hasta pronto! 😊`,
-					nextStage: 'OTRAS_CIUDADES',
-					metadata: { agentType: 'ventas', flujo: 'otras_ciudades', ciudad: context.ciudad },
-				};
-			}
-			// Sí quiere continuar → clasificar como contado sin cobertura
-			// Continúa al flujo normal pero forzando modalidad contado
-			context = { ...context, flujo: 'contado_sin_cobertura', modalidad: 'contado' };
 		}
 
 		// ── Pre-poblar ciudad desde UserData si ya está guardada ─────────────
@@ -766,33 +745,82 @@ export class VentasAgent implements IAgent {
 		}
 
 		// ── SI ESTAMOS ESPERANDO CIUDAD, procesar primero (PASO 2) ─────────
-		// Esto evita el loop infinito cuando el usuario da una ciudad que no está
-		// en las listas de cobertura (ej: Bogotá) — el fallback message.trim()
-		// captura cualquier texto como ciudad en lugar de preguntar otra vez.
 		if (context?.flujo === 'esperando_ciudad') {
 			const ciudadDetectada = (await extraerCiudadDelMensaje(message)) || message.trim();
 			const cobertura = await verificarCobertura(ciudadDetectada);
+			const ciudadCap = ciudadDetectada.charAt(0).toUpperCase() + ciudadDetectada.slice(1);
 
-			if (cobertura === 'sin_cobertura') {
-				return this.manejarSinCobertura(ciudadDetectada);
+			if (cobertura === 'cobertura') {
+				return {
+					response: `${getSaludo()} ¡Qué bien! En ${ciudadCap} tienes cobertura con envío gratis.\n\n¿La compra sería al *contado* o a *crédito*? 😊`,
+					metadata: {
+						agentType: 'ventas',
+						ciudad: ciudadDetectada,
+						ciudadValidada: true,
+						tieneCobertura: true,
+						flujo: 'esperando_modalidad',
+					},
+				};
 			}
 
-			// Ciudad detectada → preguntar qué producto busca (no mostrar catálogo todavía)
-			const tieneEnvioGratis = cobertura === 'cobertura';
-			const envioMsg = tieneEnvioGratis
-				? 'tienes envío gratis'
-				: 'puedes comprar de contado con envío por Coordinadora';
-			const saludo = getSaludo();
-
-			const ciudadCap = ciudadDetectada.charAt(0).toUpperCase() + ciudadDetectada.slice(1);
+			// Sin cobertura o desconocido → solo contado, preguntar producto directo
 			return {
-				response: `${saludo} ¡Qué bien! En ${ciudadCap} ${envioMsg}. Cuéntame, ¿qué referencia o modelo buscas? 😊`,
+				response: `${getSaludo()} ¡Qué bien! En ${ciudadCap} no tenemos cobertura directa, el envío sería por Coordinadora (el flete se cobra al hacer el pedido).\n\nCuéntame, ¿qué producto o referencia buscas? 😊`,
 				metadata: {
 					agentType: 'ventas',
 					ciudad: ciudadDetectada,
 					ciudadValidada: true,
-					tieneCobertura: tieneEnvioGratis,
+					tieneCobertura: false,
+					modalidad: 'contado',
 					flujo: null,
+				},
+			};
+		}
+
+		// ── SI ESTAMOS ESPERANDO MODALIDAD (contado / crédito) ─────────────
+		if (context?.flujo === 'esperando_modalidad') {
+			const quiereCredito = /cr[eé]dito|a cr[eé]dito|financiar|financiaci[oó]n|cuotas|pagar a cuotas|1/i.test(lower);
+			const quiereContado = /contado|efectivo|pago inmediato|precio de contado|contadito|2/i.test(lower);
+
+			if (quiereCredito) {
+				return {
+					response: `Perfecto, te ayudo con el proceso de crédito 📋\n\nVoy a hacerte unas preguntas para diligenciar tu solicitud. Son ${CREDITO_STEPS.length} campos en total, uno por uno.\n\n${CREDITO_STEPS[0].pregunta}`,
+					metadata: {
+						agentType: 'ventas',
+						flujo: 'credito',
+						modalidad: 'credito',
+						creditoData: {},
+						creditoStep: 1,
+						ciudad: context?.ciudad,
+						ciudadValidada: true,
+						tieneCobertura: context?.tieneCobertura,
+					},
+				};
+			}
+
+			if (quiereContado) {
+				return {
+					response: `¡Perfecto! Cuéntame, ¿qué producto o referencia buscas? Así te muestro lo que tenemos disponible 😊`,
+					metadata: {
+						agentType: 'ventas',
+						modalidad: 'contado',
+						ciudad: context?.ciudad,
+						ciudadValidada: true,
+						tieneCobertura: context?.tieneCobertura,
+						flujo: null,
+					},
+				};
+			}
+
+			// No entendió → preguntar de nuevo
+			return {
+				response: `Disculpa, no entendí. ¿La compra sería al *contado* o a *crédito*?\n\nResponde *1* o *contado* si pagas de contado, o *2* o *crédito* si deseas financiar.`,
+				metadata: {
+					agentType: 'ventas',
+					flujo: 'esperando_modalidad',
+					ciudad: context?.ciudad,
+					ciudadValidada: true,
+					tieneCobertura: context?.tieneCobertura,
 				},
 			};
 		}
@@ -816,80 +844,320 @@ export class VentasAgent implements IAgent {
 
 			const cobertura = await verificarCobertura(ciudadDetectada);
 
-			if (cobertura === 'sin_cobertura') {
-				return this.manejarSinCobertura(ciudadDetectada);
+			if (cobertura === 'cobertura') {
+				context = {
+					...context,
+					ciudadValidada: true,
+					ciudad: ciudadDetectada,
+					tieneCobertura: true,
+				};
+				return {
+					response: `${getSaludo()} ¡Qué bien! En ${ciudadDetectada} tienes cobertura con envío gratis.\n\n¿La compra sería al *contado* o a *crédito*? 😊`,
+					metadata: {
+						agentType: 'ventas',
+						ciudad: ciudadDetectada,
+						ciudadValidada: true,
+						tieneCobertura: true,
+						flujo: 'esperando_modalidad',
+					},
+				};
 			}
 
-			// Con cobertura o zona desconocida → marcar ciudad como validada
+			// Sin cobertura o desconocido → solo contado, preguntar producto directo
 			context = {
 				...context,
 				ciudadValidada: true,
 				ciudad: ciudadDetectada,
-				tieneCobertura: cobertura === 'cobertura',
+				tieneCobertura: false,
 			};
-
-			// La ciudad se acaba de detectar en este mensaje.
-			// No mostrar productos todavía — primero preguntar qué necesita.
-			const saludo = getSaludo();
 			return {
-				response: `${saludo} ¡Qué bien! En ${ciudadDetectada} tienes cobertura con envío gratis. Cuéntame, ¿qué referencia o modelo buscas? 😊`,
+				response: `${getSaludo()} ¡Qué bien! En ${ciudadDetectada} no tenemos cobertura directa, el envío sería por Coordinadora (el flete se cobra al hacer el pedido).\n\nCuéntame, ¿qué producto o referencia buscas? 😊`,
 				metadata: {
 					agentType: 'ventas',
 					ciudad: ciudadDetectada,
 					ciudadValidada: true,
-					tieneCobertura: context.tieneCobertura,
+					tieneCobertura: false,
+					modalidad: 'contado',
+					flujo: null,
 				},
 			};
 		}
 
-		// ── PASO 3: Detectar modalidad contado o crédito (mejora #5 y #6) ─────
-		const quiereCredito = /cr[eé]dito|a cr[eé]dito|financiar|financiaci[oó]n|cuotas|pagar a cuotas/i.test(message);
-		const quiereContado = /contado|efectivo|pago inmediato|precio de contado|cu[aá]nto vale|cu[aá]nto cuesta|precio/i.test(message);
-
-		// Mejora #5 y #7: crédito → solo perfilar producto y transferir
-		if (quiereCredito || context?.modalidad === 'credito') {
-			// Detectar si ya se identificó el producto
-			const productoIdentificado = context?.productoCredito;
-
-			if (!productoIdentificado) {
-				// Perfilar el producto (pulgadas, litros, kilos según tipo)
-				const perfilProducto = generarPreguntaPerfilProducto(message);
-
-				if (perfilProducto) {
-					return {
-						response: perfilProducto,
-						metadata: {
-							agentType: 'ventas',
-							flujo: 'credito_perfilando',
-							modalidad: 'credito',
-							ciudadValidada: context?.ciudadValidada,
-							ciudad: context?.ciudad,
-						},
-					};
-				}
-			}
-
-			// Producto ya identificado o no se pudo perfilar más → iniciar formulario
+		// ── PASO 3: Si eligió crédito → iniciar formulario ──────────────────
+		if (context?.modalidad === 'credito') {
 			return {
 				response: `Perfecto, te ayudo con el proceso de crédito 📋\n\nVoy a hacerte unas preguntas para diligenciar tu solicitud. Son ${CREDITO_STEPS.length} campos en total, uno por uno.\n\n${CREDITO_STEPS[0].pregunta}`,
 				metadata: {
 					agentType: 'ventas',
 					flujo: 'credito',
 					modalidad: 'credito',
-					creditoData: context?.productoCredito ? { producto: context.productoCredito } : {},
-					creditoStep: context?.productoCredito ? 1 : 1,
-					ciudadValidada: context?.ciudadValidada,
+					creditoData: {},
+					creditoStep: 1,
 					ciudad: context?.ciudad,
+					ciudadValidada: true,
+					tieneCobertura: context?.tieneCobertura,
 				},
 			};
 		}
 
-		// ── Flujo normal de ventas (contado) ───────────────────────────────────
-		const mostrarPrecio = quiereContado || context?.modalidad === 'contado';
+		// ── PASO 4: Detectar intención de compra ─────────────────────────────
+		const quiereComprar = /\b(?:comprar(?:lo|la)?|lo quiero|la quiero|quiero esa|quiero este|quiero comprar|c[oó]mo (?:compro|hago|puedo pagar|le hago|le hago para pagar)|quiero pagar|proceder|concretar|compralo|c[oó]mpralo|reservar|apartar|d[áa]le|confirmo compra|ya lo quiero)\b|\bcompr(?:o|ar)\s+(?:esa|este|ese)\b/i.test(message);
+
+		if (quiereComprar && context?.modalidad === 'contado') {
+			const tieneCobertura = context?.tieneCobertura;
+			const opcionPuntoFisico = tieneCobertura
+				? '\n3️⃣ Paga en un punto físico'
+				: '';
+
+			// Extraer producto de la última búsqueda o del mensaje del usuario
+			const ultimosProductos = context?.ultimaBusqueda?.results ?? [];
+			let productoSolicitado: string | undefined;
+			let productoURL: string | undefined;
+			if (ultimosProductos.length === 1) {
+				productoSolicitado = ultimosProductos[0].name;
+				productoURL = ultimosProductos[0].permalink;
+			} else if (ultimosProductos.length > 1) {
+				const lowerMsg = message.toLowerCase();
+				const match = ultimosProductos.find((p: any) =>
+					p.name.toLowerCase().includes(lowerMsg) ||
+					lowerMsg.includes(p.name.toLowerCase().slice(0, 20))
+				);
+				const selected = match ?? ultimosProductos[0];
+				productoSolicitado = selected.name;
+				productoURL = selected.permalink;
+			}
+
+			const formasPago = tieneCobertura ? 3 : 2;
+			const opcionesMsg = `Tenemos ${formasPago} formas de pago:\n1️⃣ Medios de pago autorizados\n2️⃣ Paga directamente en nuestra página web${opcionPuntoFisico}\n¿Cuál prefieres?`;
+
+			return {
+				response: opcionesMsg,
+				metadata: {
+					agentType: 'ventas',
+					flujo: 'seleccion_pago',
+					modalidad: 'contado',
+					ciudad: context?.ciudad,
+					ciudadValidada: true,
+					tieneCobertura,
+					...(productoSolicitado ? { productoCompra: productoSolicitado } : {}),
+					...(productoURL ? { productoURL } : {}),
+				},
+			};
+		}
+
+		// ── PASO 4b: Consulta genérica sobre cómo pagar ─────────────────────
+		const preguntaPago = /\b(?:c[oó]mo (?:pagar|pago|puedo pagar|hago para pagar)|medios de pago|formas de pago|d[oó]nde pago|puedo pagar)\b/i.test(message);
+		if (preguntaPago && context?.modalidad === 'contado' && !context?.flujo?.startsWith('pago_') && context?.flujo !== 'seleccion_pago') {
+			const tieneCobertura = context?.tieneCobertura;
+			return {
+				response: `Claro, estas son las opciones:\n1️⃣ Medios de pago autorizados\n2️⃣ Paga directamente en nuestra página web${tieneCobertura ? '\n3️⃣ Paga en un punto físico' : ''}\n¿Cuál prefieres?`,
+				metadata: {
+					agentType: 'ventas',
+					flujo: 'seleccion_pago',
+					modalidad: 'contado',
+					ciudad: context?.ciudad,
+					ciudadValidada: true,
+					tieneCobertura,
+				},
+			};
+		}
+
+		// ── PASO 4c: Seguimiento paso a paso para pago web ──────────────────
+		if (context?.flujo === 'pago_web_paso') {
+			const pasoActual = context?.pasoWeb ?? 1;
+			const pasos = [
+				'Añade el producto al carrito de compras.',
+				'Ve al carrito o presiona directamente el botón "Comprar".',
+				'Rellena todos tus datos de envío y pago.',
+				'Realiza el pago a través de Wompi y listo, ¡ya quedó!',
+			];
+			if (pasoActual <= pasos.length) {
+				const pasoMsg = `Paso ${pasoActual}: ${pasos[pasoActual - 1]}`;
+				const siguiente = pasoActual < pasos.length
+					? '\n\nCuando termines, dime "listo" para continuar con el siguiente paso.'
+					: '\n\n¿Lograste completar el pago?';
+				return {
+					response: pasoMsg + siguiente,
+					metadata: {
+						agentType: 'ventas',
+						flujo: pasoActual < pasos.length ? 'pago_web_paso' : 'pago_completado',
+						pasoWeb: pasoActual + 1,
+						ciudad: context?.ciudad,
+						ciudadValidada: true,
+					},
+				};
+			}
+		}
+
+		if (context?.flujo === 'pago_web') {
+			const quiereAyuda = /\bs[íi]\b|sip|dale|ok|bueno|claro|si gracias|si por favor/i.test(lower);
+			if (quiereAyuda) {
+				return {
+					response: `Paso 1: Añade el producto al carrito de compras.\n\nCuando termines, dime "listo" para continuar con el siguiente paso.`,
+					metadata: {
+						agentType: 'ventas',
+						flujo: 'pago_web_paso',
+						pasoWeb: 2,
+						ciudad: context?.ciudad,
+						ciudadValidada: true,
+					},
+				};
+			}
+			// No quiere ayuda
+			return {
+				response: `Perfecto, cualquier duda me avisas. 😊`,
+				metadata: {
+					agentType: 'ventas',
+					flujo: null,
+					ciudad: context?.ciudad,
+					ciudadValidada: true,
+				},
+			};
+		}
+
+		// ── PASO 5: Flujo de selección de pago ──────────────────────────────
+		if (context?.flujo === 'seleccion_pago') {
+			const opcion = message.trim();
+			// Recuperar URL del producto desde la última búsqueda o contexto
+			const ultimosProductos = context?.ultimaBusqueda?.results ?? [];
+			const productoURL = context?.productoURL ?? ultimosProductos[0]?.permalink;
+
+			if (/1|medios de pago|medios autorizados/i.test(opcion)) {
+				return {
+					response: `Estos son nuestros medios de pago autorizados:\nhttps://jlc-electronics.com/wp-content/uploads/2026/05/Medios_de_pago.jpeg\n\n¿Con cuál deseas pagar?`,
+					metadata: {
+						agentType: 'ventas',
+						flujo: 'pago_medios',
+						ciudad: context?.ciudad,
+						ciudadValidada: true,
+						productoURL,
+					},
+				};
+			}
+			if (/2|p[aá]gina web|web|en l[íi]nea|online/i.test(opcion)) {
+				const productLink = productoURL
+					? `\n\nLink del producto:\n${productoURL}`
+					: '';
+				return {
+					response: `Puedes pagar directamente en nuestra página web.${productLink}\n\n¿Quieres que te acompañe paso a paso con el proceso?`,
+					metadata: {
+						agentType: 'ventas',
+						flujo: 'pago_web',
+						ciudad: context?.ciudad,
+						ciudadValidada: true,
+						productoURL,
+					},
+				};
+			}
+			if (context?.tieneCobertura && /3|punto físico|físico|tienda/i.test(opcion)) {
+				return {
+					response: `Con gusto te reservamos el producto.\nPor favor compárteme tu nombre completo y número de cédula.`,
+					metadata: {
+						agentType: 'ventas',
+						flujo: 'pago_fisico',
+						ciudad: context?.ciudad,
+						ciudadValidada: true,
+					},
+				};
+			}
+			// No entendió
+			return {
+				response: `Por favor elige una opción:\n1️⃣ Medios de pago autorizados\n2️⃣ Paga directamente en nuestra página web${context?.tieneCobertura ? '\n3️⃣ Paga en un punto físico' : ''}\n¿Cuál prefieres?`,
+				metadata: {
+					agentType: 'ventas',
+					flujo: 'seleccion_pago',
+					ciudad: context?.ciudad,
+					ciudadValidada: true,
+					tieneCobertura: context?.tieneCobertura,
+				},
+			};
+		}
+
+		// ── PASO 6: Detectar datos personales del cliente ──────────────────
+		// Patrones: nombre + cédula, dirección, teléfono
+		const datosPersonales: Record<string, string> = {};
+		const cedulaMatch = message.match(/\b\d{5,12}\b/);
+		if (cedulaMatch) datosPersonales.cedulaCliente = cedulaMatch[0];
+
+		const nombreMatch = message.match(/^(?:mi nombre es|soy|me llamo)\s+([A-Za-záéíóúñÁÉÍÓÚÑ\s]+)/i);
+		if (nombreMatch) datosPersonales.nombreCliente = nombreMatch[1].trim();
+
+		if (message.length > 5 && message.split(/[,;]/).length >= 2 && datosPersonales.cedulaCliente) {
+			// Posible formato: "Nicolas, 10853444444, cr34 via lorena"
+			const partes = message.split(/[,;]/).map((p) => p.trim()).filter(Boolean);
+			if (partes.length >= 2 && !datosPersonales.nombreCliente) {
+				datosPersonales.nombreCliente = partes[0];
+			}
+			if (partes.length >= 3) {
+				datosPersonales.direccion = partes.slice(2).join(', ');
+			}
+		}
+
+		// ── PASO 7: Perfilación de producto (categoría general sin especificar) ─
+		const categoriaGeneral = /^(?:busco|quiero|necesito|me interesa|tiene[ns]?)\s*(?:un[oa]?|unas?|información de|info de)?\s*(televisor|televisores|tv|nevera|neveras|refrigerador|lavadora|lavadoras|estufa|microondas|licuadora|aire acondicionado|congelador|parlante|parlantes|sonido|equipo de sonido)\b/i.test(message);
+		const yaTieneTamano = /(\d+\s*(?:pulgadas|pulg|lt|litros|kg|kilos))|(?:grande|pequeñ[oa]|mediano|mediana)/i.test(message);
+		const yaTienePresupuesto = context?.userData?.presupuesto || context?.presupuesto;
+
+		if (context?.flujo === 'perfilando_producto') {
+			// Pregunta 1 ya fue hecha → procesar respuesta de tamaño
+			const tamanoMencionado = message.match(/(\d+)\s*(?:pulgadas|pulg|lt|litros|kg|kilos)/i);
+			if (tamanoMencionado) {
+				context = { ...context, tamanoPerfil: tamanoMencionado[0], flujo: 'perfilando_presupuesto' };
+				return {
+					response: '¿Tienes un presupuesto aproximado en mente? Así te recomiendo lo que mejor se ajuste.',
+					metadata: {
+						agentType: 'ventas',
+						flujo: 'perfilando_presupuesto',
+						ciudad: context?.ciudad,
+						ciudadValidada: true,
+						...datosPersonales,
+					},
+				};
+			}
+			return {
+				response: '¿Qué tamaño buscas? Por ejemplo: 43, 55 o 65 pulgadas (o litros/kilos según el producto).',
+				metadata: {
+					agentType: 'ventas',
+					flujo: 'perfilando_producto',
+					ciudad: context?.ciudad,
+					ciudadValidada: true,
+					...datosPersonales,
+				},
+			};
+		}
+
+		if (context?.flujo === 'perfilando_presupuesto') {
+			const presupuestoMatch = message.match(/(\d[\d.,]*)/);
+			if (presupuestoMatch) {
+				context = { ...context, presupuesto: presupuestoMatch[1], flujo: null };
+				datosPersonales.presupuesto = presupuestoMatch[1];
+			} else {
+				context = { ...context, flujo: null };
+			}
+			// Continúa al flujo normal para mostrar productos
+		}
+
+		// Si es categoría general sin tamaño ni presupuesto, entrar a perfilación
+		if (categoriaGeneral && !yaTieneTamano && !yaTienePresupuesto && context?.flujo !== 'perfilando_presupuesto') {
+			return {
+				response: '¿Qué tamaño buscas? Por ejemplo: 43, 55 o 65 pulgadas (o litros/kilos según el producto).',
+				metadata: {
+					agentType: 'ventas',
+					flujo: 'perfilando_producto',
+					ciudad: context?.ciudad,
+					ciudadValidada: true,
+					...datosPersonales,
+				},
+			};
+		}
+
+		// Los datos personales se pasan en metadata para que message.handler los guarde
+
+		// ── Flujo normal de ventas (mostrar productos) ──────────────────────
 		const ciudadStr = context?.ciudad ? `En ${context.ciudad.charAt(0).toUpperCase() + context.ciudad.slice(1)}` : '';
 		const envioStr = context?.tieneCobertura
 			? 'tienes envío gratis'
-			: 'puedes comprar de contado con envío por Coordinadora';
+			: 'pago de contado (flete por Coordinadora a cargo del cliente)';
 
 		// Detectar si pide más opciones
 		const pideMas = /(?:tienes\s*mas|hay\s*m[áa]s|m[áa]s\s*opciones|otr[oa]s?\s*opciones|quiero\s*ver\s*m[áa]s|mu[ée]strame\s*m[áa]s|busco\s*otr[oa]|alg[úu]n\s*otr[oa]|otr[oa]s?\s*opciones|diferente)/i.test(message);
@@ -949,38 +1217,52 @@ export class VentasAgent implements IAgent {
 			}
 		}
 
-		const productoActual = products?.[productoIndex];
-		const totalProductos = products?.length ?? 0;
-		const hayMas = productoIndex < totalProductos - 1;
+		// Formatear productos para el prompt de la IA
+		const productListStr = products.length > 0
+			? products.map((p: any, i: number) => {
+				const precio = p.price ? `$${Number(p.price).toLocaleString('es-CO')}` : 'Consultar precio';
+				return `${i + 1}. ${p.name} - ${precio}\n   ${p.permalink}`;
+			}).join('\n\n')
+			: 'No se encontraron productos.';
 
-		let response: string;
+		const { system, user } = buildGemmaPrompt({
+			instruccion: `Eres ${AGENT_NAME}, asesora comercial de JLC Electronics Colombia.
+Tu tono es cálido, claro y directo. Hablas en español colombiano.
+${ciudadStr} ${envioStr}.
 
-		if (productoActual) {
-			const precioStr = mostrarPrecio && productoActual.price
-				? ` - $${Number(productoActual.price).toLocaleString('es-CO')}`
-				: '';
-			const msgWords = message.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
-			const nombreProducto = productoActual.name.toLowerCase();
-			const coincide = msgWords.some((w) => nombreProducto.includes(w));
+REGLAS:
+- El cliente busca un producto. Usa el CATÁLOGO para recomendar lo más relevante.
+- Menciona máximo 1-2 productos con su nombre y enlace.
+- Si hay productos, preséntalos de forma natural.
+- Si NO hay productos, pide amablemente más detalles (marca, modelo, referencia).
+- No inventes productos ni precios.
+- No compartas datos de agencias físicas.
+- Responde en máximo 3 líneas, sin asteriscos ni formato.
+- CAPTURA Y REGISTRA automáticamente cualquier dato personal que el cliente mencione: nombre, cédula, dirección, teléfono, presupuesto. No los pidas de nuevo si ya fueron mencionados.
+- Si el cliente cambia de tema (ej: pregunta por cartera, garantías), redirecto suavemente al flujo de compra activo: "Entiendo, pero antes déjame ayudarte a terminar tu compra. ¿Quieres continuar?" Solo transferir si el cliente insiste.`,
+			ejemplos: [
+				{
+					cliente: 'Busco una nevera',
+					asistente: 'Claro, tenemos neveras disponibles. Por ejemplo la Nevecón JLC No Frost 587L. ¿Te interesa ver más opciones o quieres los detalles de esa?',
+				},
+				{
+					cliente: 'Quiero un televisor de 55 pulgadas',
+					asistente: 'Tenemos un televisor que podría interesarte. ¿Te comparto el enlace para que lo veas?',
+				},
+				{
+					cliente: 'Necesito un repuesto para lavadora',
+					asistente: 'No encontré repuestos exactos en el catálogo. ¿Me indicas la marca y modelo de tu lavadora? Así busco más preciso.',
+				},
+			],
+			historial: formatHistory(context?.history),
+			mensajeCliente: message,
+		});
 
-			let intro: string;
-			if (pideMas) {
-				intro = `Otra opción: *${productoActual.name}*${precioStr}`;
-			} else if (coincide) {
-				intro = `Te recomiendo nuestro *${productoActual.name}*${precioStr}`;
-			} else {
-				intro = `No encontré "${message}" exactamente, pero este producto podría interesarte: *${productoActual.name}*${precioStr}`;
-			}
+		// Incluir catálogo como parte del mensaje para que la IA lo use
+		const catalogPrompt = `\n\nCATÁLOGO DE PRODUCTOS:\n${productListStr}\n\n---\nResponde al cliente según las reglas anteriores.`;
 
-			const masTexto = hayMas
-				? '\n\n¿Quieres ver más opciones o te interesa esta?'
-				: '\n\nEstos son todos los que tengo disponibles. ¿Te interesa alguno?';
-			response = `${ciudadStr} ${envioStr}. ${intro}:\n${productoActual.permalink}${masTexto}`;
-		} else if (pideMas && totalProductos > 0) {
-			response = `${ciudadStr} ${envioStr}. Estos son todos los que tengo disponibles. ¿Te interesa alguno? 😊`;
-		} else {
-			response = `${ciudadStr} ${envioStr}. No encontré "${message}" en nuestro catálogo. ¿Podrías darme la referencia o el modelo exacto que buscas? 😊`;
-		}
+		const raw = await generateResponse(user + catalogPrompt, system);
+		const response = cleanResponse(raw);
 
 		return {
 			response,
@@ -993,6 +1275,7 @@ export class VentasAgent implements IAgent {
 				ultimaBusqueda: products.length > 0
 					? { results: products.slice(0, 6), productoIndex }
 					: undefined,
+				...datosPersonales,
 			},
 		};
 	}
@@ -1037,34 +1320,6 @@ async function extraerCiudadDelMensaje(mensaje: string): Promise<string | null> 
 	}
 
 	return null;
-}
-
-// ─── Helper: pregunta de perfilamiento para crédito (mejora #5) ───────────────
-
-function generarPreguntaPerfilProducto(mensaje: string): string | null {
-	const lower = mensaje.toLowerCase();
-
-	if (/televisor|tv\b|tele\b|pantalla/i.test(lower)) {
-		return '¿De cuántas pulgadas necesitas el televisor? (ej: 32", 43", 55")';
-	}
-	if (/nevera|refrigerador|ref[eé]r|congelador/i.test(lower)) {
-		return '¿De cuántos litros necesitas la nevera? (ej: 250 lt, 300 lt, 400 lt)';
-	}
-	if (/lavadora/i.test(lower)) {
-		return '¿De cuántos kilos necesitas la lavadora? (ej: 8 kg, 10 kg, 14 kg)';
-	}
-	if (/estufa|cocina/i.test(lower)) {
-		return '¿La estufa sería a gas, eléctrica o mixta?';
-	}
-	if (/aire|a\/c|acondicionado/i.test(lower)) {
-		return '¿Para cuántos metros cuadrados necesitas el aire acondicionado?';
-	}
-	if (/microondas/i.test(lower)) {
-		return '¿De cuántos litros o watts necesitas el microondas?';
-	}
-
-	// Producto no identificado aún
-	return '¿Qué producto te interesa financiar? (ej: nevera, lavadora, televisor...)';
 }
 
 // ─── AGENTE CARTERA ──────────────────────────────────────────────────────────
