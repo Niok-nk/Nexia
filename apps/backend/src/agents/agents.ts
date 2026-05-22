@@ -740,11 +740,16 @@ export class VentasAgent implements IAgent {
 		let hayProductos = false;
 
 		try {
-			const products = await wooCommerceService.searchProducts(message, 4);
+			let products = await wooCommerceService.searchProducts(message, 4);
+			// Si no encuentra exactos, mostrar el producto más cercano disponible
+			if (!products || products.length === 0) {
+				const generalProducts = await wooCommerceService.getProducts(3);
+				products = generalProducts.filter((p) => p.name && p.permalink);
+			}
 			hayProductos = products?.length > 0;
 			productosFormateados = hayProductos
-				? this.formatProductosParaPrompt(products, mostrarPrecio)
-				: 'No se encontraron productos que coincidan con la búsqueda.';
+				? this.formatProductosParaPrompt(products.slice(0, 1), mostrarPrecio)
+				: 'No hay productos disponibles en este momento.';
 		} catch {
 			productosFormateados = 'No fue posible consultar el catálogo en este momento.';
 		}
@@ -754,12 +759,14 @@ export class VentasAgent implements IAgent {
 Tu tono es cálido, claro y directo. Hablas en español colombiano. Tus respuestas son cortas (máximo 3 líneas).
 
 REGLAS:
-- Si hay productos en el CATÁLOGO, menciona al menos uno con nombre y enlace.
+- Muestra SIEMPRE el producto del CATÁLOGO aunque no sea el que busca el cliente. Es la mejor alternativa disponible.
+- Máximo 1 producto. Nunca más de 1.
+- Si hay producto en CATÁLOGO, menciónalo con nombre y enlace.
 - No inventes productos ni precios. Solo usa los del CATÁLOGO.
-- ${mostrarPrecio ? 'Puedes mostrar el precio de los productos.' : 'NO muestres precios; el cliente no ha indicado que quiere comprar de contado.'}
-- Si no hay productos coincidentes, pregunta al cliente si puede ser más específico (marca, modelo, capacidad) o si busca algo diferente.
-- Solo si el cliente insiste 2 veces sin encontrar el producto, sugiere visitar https://jlc-electronics.com/
-- Nunca menciones a Cristina ni su número en una primera búsqueda sin resultados. Ese contacto es solo para emergencias cuando el bot no pueda resolver.
+- ${mostrarPrecio ? 'Puedes mostrar el precio.' : 'NO muestres precios.'}
+- Si el catálogo está vacío, pregunta al cliente si puede ser más específico.
+- Solo si el cliente insiste 2 veces sin encontrar nada, sugiere visitar https://jlc-electronics.com/
+- Nunca menciones a Cristina ni su número. Ese contacto es solo para emergencias cuando el bot no pueda resolver.
 - Si el cliente menciona crédito o cuotas, indícale que iniciarás el proceso de solicitud.
 - NO compartas números, direcciones ni datos de agencias físicas. Eso lo hace el asesor humano.
 - La ciudad del cliente ya fue validada: ${context?.ciudad || 'no especificada'}. ${context?.tieneCobertura ? 'Tiene cobertura con envío gratis.' : 'Compra de contado, envío por Coordinadora a su cargo.'}
