@@ -909,6 +909,21 @@ export class VentasAgent implements IAgent {
 				? '\n3️⃣ Paga en un punto físico'
 				: '';
 
+			// Extraer producto de la última búsqueda o del mensaje del usuario
+			const ultimosProductos = context?.ultimaBusqueda?.results ?? [];
+			let productoSolicitado: string | undefined;
+			if (ultimosProductos.length === 1) {
+				productoSolicitado = ultimosProductos[0].name;
+			} else if (ultimosProductos.length > 1) {
+				// Intentar detectar cuál producto menciona en su mensaje
+				const lowerMsg = message.toLowerCase();
+				const match = ultimosProductos.find((p: any) =>
+					p.name.toLowerCase().includes(lowerMsg) ||
+					lowerMsg.includes(p.name.toLowerCase().slice(0, 20))
+				);
+				productoSolicitado = match?.name ?? ultimosProductos[0].name;
+			}
+
 			return {
 				response: `Tenemos 3 formas de pago:\n1️⃣ Medios de pago autorizados\n2️⃣ Paga directamente en nuestra página web${opcionPuntoFisico}\n¿Cuál prefieres?`,
 				metadata: {
@@ -918,6 +933,7 @@ export class VentasAgent implements IAgent {
 					ciudad: context?.ciudad,
 					ciudadValidada: true,
 					tieneCobertura,
+					...(productoSolicitado ? { productoCompra: productoSolicitado } : {}),
 				},
 			};
 		}

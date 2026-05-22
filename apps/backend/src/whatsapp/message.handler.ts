@@ -335,6 +335,8 @@ export async function processIncomingMessage(
 		if (repuesto?.nombreCliente) ud.nombre = repuesto.nombreCliente;
 		if (repuesto?.repuesto) ud.productoSolicitado = repuesto.repuesto;
 
+		if (metadata?.productoCompra) ud.productoSolicitado = metadata.productoCompra;
+
 		const extra = { ...safeParseJson(userDataRecord?.extra) };
 		const mergedExtra = { ...extra, ...metadata };
 		const udHasData = Object.keys(ud).length > 0;
