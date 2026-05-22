@@ -102,7 +102,14 @@ function cleanResponse(raw: string): string {
 		if (result.length > 10) text = result;
 	}
 
-	// 5) Cortar listas de "User Role:", "Client Goal:", etc.
+	// 5) Quitar auto-verificación tipo "Checking constraints: ..." y "Option N: ..."
+	text = text.replace(/^Checking\s+constraints:[\s\S]*?(?=\n(?:Sí|¡Claro|Tenemos|Esa|La|Perfecto|\d+\.|[\wÁÉÍÓÚÑ]))/i, '').trim();
+	text = text.replace(/^(?:Option|Opción)\s+\d+\s*:\s*[^\n]*/im, '').trim();
+	text = text.replace(/\n(?:Option|Opción)\s+\d+\s*:\s*[^\n]*/gi, '').trim();
+	text = text.replace(/\d+\s*lines?\s*max\??\s*:\s*yes|no|sí|si/gi, '').trim();
+	text = text.replace(/(?:max|máx)\s*\d+\s*(?:lines|palabras|productos)\??\s*\??\s*(?:yes|no|sí|si)/gi, '').trim();
+
+	// 6) Cortar listas de "User Role:", "Client Goal:", etc.
 	const labelRe = /(?:^|[\s.])(?:user role|client goal|customer goal|customer's current request|customer current request|context(?:\s+from\s+previous\s+examples)?|reference info|style|i need to know|the customer is interested|the draft|following the examples)\s*:?/gi;
 	const labelMatches = [...text.matchAll(labelRe)];
 	if (labelMatches.length > 0) {
@@ -893,7 +900,78 @@ export class VentasAgent implements IAgent {
 			};
 		}
 
-		// ── Flujo normal de ventas (contado) ───────────────────────────────────
+		// ── PASO 4: Detectar intención de compra ─────────────────────────────
+		const quiereComprar = /\b(?:comprar|lo quiero|la quiero|quiero esa|quiero este|c[oó]mo compro|c[oó]mo hago|quiero pagar|proceder|concretar|compralo|c[oó]mpralo|reservar|apartar)\b/i.test(message);
+
+		if (quiereComprar && context?.modalidad === 'contado') {
+			const tieneCobertura = context?.tieneCobertura;
+			const opcionPuntoFisico = tieneCobertura
+				? '\n3️⃣ Paga en un punto físico'
+				: '';
+
+			return {
+				response: `Tenemos 3 formas de pago:\n1️⃣ Medios de pago autorizados\n2️⃣ Paga directamente en nuestra página web${opcionPuntoFisico}\n¿Cuál prefieres?`,
+				metadata: {
+					agentType: 'ventas',
+					flujo: 'seleccion_pago',
+					modalidad: 'contado',
+					ciudad: context?.ciudad,
+					ciudadValidada: true,
+					tieneCobertura,
+				},
+			};
+		}
+
+		// ── PASO 5: Flujo de selección de pago ──────────────────────────────
+		if (context?.flujo === 'seleccion_pago') {
+			const opcion = message.trim();
+			if (/1|medios de pago|medios autorizados/i.test(opcion)) {
+				return {
+					response: 'Aquí tienes los medios de pago autorizados. ¿Cuál prefieres utilizar?',
+					metadata: {
+						agentType: 'ventas',
+						flujo: 'pago_medios',
+						ciudad: context?.ciudad,
+						ciudadValidada: true,
+					},
+				};
+			}
+			if (/2|p[aá]gina web|web|en l[íi]nea|online/i.test(opcion)) {
+				return {
+					response: `Puedes pagar directamente en nuestra página: https://jlc-electronics.com/\n¿Quieres que te acompañe paso a paso con el proceso?`,
+					metadata: {
+						agentType: 'ventas',
+						flujo: 'pago_web',
+						ciudad: context?.ciudad,
+						ciudadValidada: true,
+					},
+				};
+			}
+			if (context?.tieneCobertura && /3|punto físico|físico|tienda/i.test(opcion)) {
+				return {
+					response: `Con gusto te reservamos el producto.\nPor favor compárteme tu nombre completo y número de cédula.`,
+					metadata: {
+						agentType: 'ventas',
+						flujo: 'pago_fisico',
+						ciudad: context?.ciudad,
+						ciudadValidada: true,
+					},
+				};
+			}
+			// No entendió
+			return {
+				response: `Por favor elige una opción:\n1️⃣ Medios de pago autorizados\n2️⃣ Paga directamente en nuestra página web${context?.tieneCobertura ? '\n3️⃣ Paga en un punto físico' : ''}\n¿Cuál prefieres?`,
+				metadata: {
+					agentType: 'ventas',
+					flujo: 'seleccion_pago',
+					ciudad: context?.ciudad,
+					ciudadValidada: true,
+					tieneCobertura: context?.tieneCobertura,
+				},
+			};
+		}
+
+		// ── Flujo normal de ventas (mostrar productos) ──────────────────────
 		const ciudadStr = context?.ciudad ? `En ${context.ciudad.charAt(0).toUpperCase() + context.ciudad.slice(1)}` : '';
 		const envioStr = context?.tieneCobertura
 			? 'tienes envío gratis'
