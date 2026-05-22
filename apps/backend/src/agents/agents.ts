@@ -894,7 +894,6 @@ export class VentasAgent implements IAgent {
 		}
 
 		// ── Flujo normal de ventas (contado) ───────────────────────────────────
-		const mostrarPrecio = true;
 		const ciudadStr = context?.ciudad ? `En ${context.ciudad.charAt(0).toUpperCase() + context.ciudad.slice(1)}` : '';
 		const envioStr = context?.tieneCobertura
 			? 'tienes envío gratis'
@@ -958,38 +957,50 @@ export class VentasAgent implements IAgent {
 			}
 		}
 
-		const productoActual = products?.[productoIndex];
-		const totalProductos = products?.length ?? 0;
-		const hayMas = productoIndex < totalProductos - 1;
+		// Formatear productos para el prompt de la IA
+		const productListStr = products.length > 0
+			? products.map((p: any, i: number) => {
+				const precio = p.price ? `$${Number(p.price).toLocaleString('es-CO')}` : 'Consultar precio';
+				return `${i + 1}. ${p.name} - ${precio}\n   ${p.permalink}`;
+			}).join('\n\n')
+			: 'No se encontraron productos.';
 
-		let response: string;
+		const { system, user } = buildGemmaPrompt({
+			instruccion: `Eres ${AGENT_NAME}, asesora comercial de JLC Electronics Colombia.
+Tu tono es cálido, claro y directo. Hablas en español colombiano.
+${ciudadStr} ${envioStr}.
 
-		if (productoActual) {
-			const precioStr = mostrarPrecio && productoActual.price
-				? ` - $${Number(productoActual.price).toLocaleString('es-CO')}`
-				: '';
-			const msgWords = message.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
-			const nombreProducto = productoActual.name.toLowerCase();
-			const coincide = msgWords.some((w) => nombreProducto.includes(w));
+REGLAS:
+- El cliente busca un producto. Usa el CATÁLOGO para recomendar lo más relevante.
+- Menciona máximo 1-2 productos con su nombre y enlace.
+- Si hay productos, preséntalos de forma natural.
+- Si NO hay productos, pide amablemente más detalles (marca, modelo, referencia).
+- No inventes productos ni precios.
+- No compartas datos de agencias físicas.
+- Responde en máximo 3 líneas, sin asteriscos ni formato.`,
+			ejemplos: [
+				{
+					cliente: 'Busco una nevera',
+					asistente: 'Claro, tenemos neveras disponibles. Por ejemplo la Nevecón JLC No Frost 587L. ¿Te interesa ver más opciones o quieres los detalles de esa?',
+				},
+				{
+					cliente: 'Quiero un televisor de 55 pulgadas',
+					asistente: 'Tenemos un televisor que podría interesarte. ¿Te comparto el enlace para que lo veas?',
+				},
+				{
+					cliente: 'Necesito un repuesto para lavadora',
+					asistente: 'No encontré repuestos exactos en el catálogo. ¿Me indicas la marca y modelo de tu lavadora? Así busco más preciso.',
+				},
+			],
+			historial: formatHistory(context?.history),
+			mensajeCliente: message,
+		});
 
-			let intro: string;
-			if (pideMas) {
-				intro = `Otra opción: *${productoActual.name}*${precioStr}`;
-			} else if (coincide) {
-				intro = `Te recomiendo nuestro *${productoActual.name}*${precioStr}`;
-			} else {
-				intro = `No encontré "${message}" exactamente, pero este producto podría interesarte: *${productoActual.name}*${precioStr}`;
-			}
+		// Incluir catálogo como parte del mensaje para que la IA lo use
+		const catalogPrompt = `\n\nCATÁLOGO DE PRODUCTOS:\n${productListStr}\n\n---\nResponde al cliente según las reglas anteriores.`;
 
-			const masTexto = hayMas
-				? '\n\n¿Quieres ver más opciones o te interesa esta?'
-				: '\n\nEstos son todos los que tengo disponibles. ¿Te interesa alguno?';
-			response = `${ciudadStr} ${envioStr}. ${intro}:\n${productoActual.permalink}${masTexto}`;
-		} else if (pideMas && totalProductos > 0) {
-			response = `${ciudadStr} ${envioStr}. Estos son todos los que tengo disponibles. ¿Te interesa alguno? 😊`;
-		} else {
-			response = `${ciudadStr} ${envioStr}. No encontré "${message}" en nuestro catálogo. ¿Podrías darme la referencia o el modelo exacto que buscas? 😊`;
-		}
+		const raw = await generateResponse(user + catalogPrompt, system);
+		const response = cleanResponse(raw);
 
 		return {
 			response,
