@@ -26,18 +26,41 @@ const DEPARTAMENTOS_CONOCIDOS = [
 	'nariño', 'narino', 'cauca', 'putumayo', 'huila', 'valle', 'valle del cauca',
 ];
 
-function extraerCiudad(mensaje: string): string | null {
+function extraerUbicacion(mensaje: string): { ciudad: string | null; departamento: string | null } {
 	const lower = mensaje.toLowerCase().trim();
-	const todas = [...CIUDADES_CONOCIDAS, ...DEPARTAMENTOS_CONOCIDOS];
-	const encontrada = todas.find((l) => lower.includes(l));
-	if (encontrada) return encontrada;
 
-	// Patrones como "soy de X", "vivo en X", etc.
-	const patron = /(?:soy de|estoy en|vivo en|escribo desde|desde|ubicado en|me encuentro en)\s+([a-záéíóúñ\s]{3,30})/i;
-	const match = mensaje.match(patron);
-	if (match) return match[1].trim().toLowerCase();
+	let ciudad: string | null = null;
+	let departamento: string | null = null;
 
-	return null;
+	const depEncontrado = DEPARTAMENTOS_CONOCIDOS.find((d) => lower.includes(d));
+	if (depEncontrado) departamento = depEncontrado;
+
+	const ciudadEncontrada = CIUDADES_CONOCIDAS.find((c) => lower.includes(c));
+	if (ciudadEncontrada) ciudad = ciudadEncontrada;
+
+	// Si no se encontró ciudad conocida pero sí departamento,
+	// usar el texto completo como ciudad (ej: "el peñol nariño")
+	if (!ciudad && departamento) {
+		const idx = lower.indexOf(departamento);
+		const antes = lower.slice(0, idx).trim();
+		if (antes.length > 2) ciudad = antes;
+	}
+
+	// Patrones como "soy de X", "vivo en X"
+	if (!ciudad && !departamento) {
+		const patron = /(?:soy de|estoy en|vivo en|escribo desde|desde|ubicado en|me encuentro en)\s+([a-záéíóúñ\s]{3,30})/i;
+		const match = mensaje.match(patron);
+		if (match) {
+			const texto = match[1].trim().toLowerCase();
+			const dep2 = DEPARTAMENTOS_CONOCIDOS.find((d) => texto.includes(d));
+			if (dep2) departamento = dep2;
+			const ciu2 = CIUDADES_CONOCIDAS.find((c) => texto.includes(c));
+			if (ciu2) ciudad = ciu2;
+			if (!ciu2) ciudad = texto;
+		}
+	}
+
+	return { ciudad, departamento };
 }
 
 /**
@@ -146,11 +169,13 @@ export async function handleIncomingMessage(msg: WAMessage): Promise<void> {
 			extra: safeParseJson(userDataRecord?.extra),
 		};
 
-		// Intentar extraer ciudad directamente del mensaje actual y guardarla
-		// incluso antes de que el agente la procese
-		const ciudadDelMensaje = extraerCiudad(body);
+		// Intentar extraer ciudad y departamento directamente del mensaje actual
+		const { ciudad: ciudadDelMensaje, departamento: deptoDelMensaje } = extraerUbicacion(body);
 		if (ciudadDelMensaje && !userData.ciudad) {
 			userData.ciudad = ciudadDelMensaje;
+		}
+		if (deptoDelMensaje && !userData.departamento) {
+			userData.departamento = deptoDelMensaje;
 		}
 
 		const context: Record<string, any> = {
@@ -227,7 +252,11 @@ export async function handleIncomingMessage(msg: WAMessage): Promise<void> {
 			} else if (userData.ciudad && userData.ciudad !== userDataRecord?.ciudad) {
 				ud.ciudad = userData.ciudad;
 			}
-			if (metadata?.departamento) ud.departamento = metadata.departamento;
+			if (metadata?.departamento) {
+				ud.departamento = metadata.departamento;
+			} else if (userData.departamento && userData.departamento !== userDataRecord?.departamento) {
+				ud.departamento = userData.departamento;
+			}
 
 			const credito = metadata?.creditoData;
 			if (credito?.nombres) ud.nombre = credito.nombres;
