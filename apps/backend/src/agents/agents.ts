@@ -892,11 +892,33 @@ export class VentasAgent implements IAgent {
 		let hayProductos = false;
 
 		try {
+			// 1. Buscar con el mensaje completo
 			products = await wooCommerceService.searchProducts(message, 4);
+
+			// 2. Si no encuentra, extraer palabras clave relevantes y buscar individualmente
 			if (!products || products.length === 0) {
-				const generalProducts = await wooCommerceService.getProducts(3);
+				const palabrasClave = message
+					.toLowerCase()
+					.replace(/[.,!?¡¿]+/g, '')
+					.split(/\s+/)
+					.filter((w) => w.length > 3)
+					.filter((w) => !['para', 'con', 'mas', 'más', 'que', 'una', 'uno', 'las', 'los', 'del', 'por', 'pero', 'esta', 'todo', 'como', 'entre', 'sobre', 'cuando', 'donde', 'tiene', 'ser', 'desde', 'hasta', 'cada'].includes(w));
+
+				for (const keyword of palabrasClave) {
+					const results = await wooCommerceService.searchProducts(keyword, 4);
+					if (results && results.length > 0) {
+						products = results;
+						break;
+					}
+				}
+			}
+
+			// 3. Si sigue sin resultados, traer productos generales
+			if (!products || products.length === 0) {
+				const generalProducts = await wooCommerceService.getProducts(10);
 				products = generalProducts.filter((p) => p.name && p.permalink);
 			}
+
 			hayProductos = products?.length > 0;
 		} catch {
 			// si falla, products se queda como []
@@ -915,9 +937,16 @@ export class VentasAgent implements IAgent {
 			const precioStr = mostrarPrecio && primerProducto.price
 				? ` - $${Number(primerProducto.price).toLocaleString('es-CO')}`
 				: '';
-			response = `${ciudadStr} ${envioStr}. Te recomiendo nuestro *${primerProducto.name}*${precioStr}:\n${primerProducto.permalink}\n\n¿Te interesa esta opción o buscas algo diferente?`;
+			// Verificar si el producto coincide con lo que el usuario busca
+			const msgWords = message.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+			const nombreProducto = primerProducto.name.toLowerCase();
+			const coincide = msgWords.some((w) => nombreProducto.includes(w));
+			const intro = coincide
+				? `Te recomiendo nuestro *${primerProducto.name}*${precioStr}`
+				: `No encontré "${message}" exactamente, pero este producto podría interesarte: *${primerProducto.name}*${precioStr}`;
+			response = `${ciudadStr} ${envioStr}. ${intro}:\n${primerProducto.permalink}\n\n¿Te interesa esta opción o buscas algo diferente?`;
 		} else {
-			response = `${ciudadStr} ${envioStr}. Cuéntame más detalles de la referencia o modelo que buscas para ayudarte mejor. 😊`;
+			response = `${ciudadStr} ${envioStr}. No encontré "${message}" en nuestro catálogo. ¿Podrías darme la referencia o el modelo exacto que buscas? 😊`;
 		}
 
 		return {
