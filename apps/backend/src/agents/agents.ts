@@ -764,7 +764,8 @@ REGLAS:
 - Si hay producto en CATÁLOGO, menciónalo con nombre y enlace.
 - No inventes productos ni precios. Solo usa los del CATÁLOGO.
 - ${mostrarPrecio ? 'Puedes mostrar el precio.' : 'NO muestres precios.'}
-- Si el catálogo está vacío, pregunta al cliente si puede ser más específico.
+- Todos los productos son marca JLC, NO preguntes por la marca. Pregunta por la referencia o el modelo del producto.
+- Si el catálogo está vacío, pide al cliente la referencia del producto que busca.
 - Solo si el cliente insiste 2 veces sin encontrar nada, sugiere visitar https://jlc-electronics.com/
 - Nunca menciones a Cristina ni su número. Ese contacto es solo para emergencias cuando el bot no pueda resolver.
 - Si el cliente menciona crédito o cuotas, indícale que iniciarás el proceso de solicitud.
