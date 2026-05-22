@@ -296,17 +296,129 @@ const CIUDADES_COBERTURA: string[] = [
  * Determina si una ciudad/departamento mencionado tiene cobertura JLC.
  * Retorna: 'cobertura' | 'sin_cobertura' | 'desconocido'
  */
-function verificarCobertura(lugar: string): 'cobertura' | 'sin_cobertura' | 'desconocido' {
+async function verificarCobertura(lugar: string): Promise<'cobertura' | 'sin_cobertura' | 'desconocido'> {
 	if (!lugar) return 'desconocido';
 	const l = lugar.toLowerCase().trim();
 
 	if (DEPARTAMENTOS_COBERTURA.some((d) => l.includes(d))) return 'cobertura';
 	if (CIUDADES_COBERTURA.some((c) => l.includes(c))) return 'cobertura';
 
-	// Si menciona un lugar pero no está en la lista → sin cobertura propia
-	// Si es muy corto o ambiguo → desconocido
-	if (l.length > 3) return 'sin_cobertura';
+	// Si no se encuentra en listas → preguntar a Gemini como fallback
+	if (l.length > 3) {
+		const iaResult = await verificarCoberturaConIA(l);
+		if (iaResult !== 'desconocido') return iaResult;
+		return 'sin_cobertura';
+	}
 	return 'desconocido';
+}
+
+// ─── Descripción del área de cobertura JLC para Gemini ──────────────────────
+//
+// Fuente: mapa oficial JLC Electronics (Nariño, Cauca, Putumayo, Huila, Valle)
+const COBERTURA_DESCRIPCION = `
+JLC Electronics tiene cobertura de envío gratis en los siguientes departamentos y municipios de Colombia:
+
+DEPARTAMENTOS CON COBERTURA TOTAL:
+- Nariño (completo)
+- Cauca (completo)
+- Putumayo (completo)
+- Huila (completo)
+- Valle del Cauca (completo)
+
+MUNICIPIOS PRINCIPALES CUBIERTOS:
+Nariño: Pasto, Tumaco, Ipiales, La Unión, Samaniego, Túquerres, Barbacoas, El Charco, Sandoná
+Cauca: Popayán, Santander de Quilichao, Miranda, Patía, Puerto Tejada, Piendamó, El Tambo, Cajibío
+Putumayo: Mocoa, Puerto Asís, Orito, Sibundoy, Valle del Guamuez, San Miguel, Villagarzón
+Huila: Neiva, Pitalito, Garzón, La Plata, Campoalegre, Rivera, Palermo, Gigante, Isnos, San Agustín
+Valle del Cauca: Cali, Buenaventura, Palmira, Tuluá, Buga, Cartago, Jamundí, Yumbo, Florida, Pradera, Zarzal, La Victoria, Roldanillo, El Cerrito
+
+CUBRIMOS TODO EL DEPARTAMENTO, no solo los municipios listados.
+NO tenemos cobertura en otros departamentos como Antioquia, Bogotá/Cundinamarca, Santander, Boyacá, etc.
+`.trim();
+
+// ─── AI fallback: detectar ciudad usando Gemini ────────────────────────────
+// Se usa cuando las listas rápidas no encuentran la ubicación.
+const IA_CACHE = new Map<string, { result: any; expires: number }>();
+
+function getCached<T>(key: string): T | null {
+	const entry = IA_CACHE.get(key);
+	if (entry && entry.expires > Date.now()) return entry.result as T;
+	IA_CACHE.delete(key);
+	return null;
+}
+
+function setCache(key: string, result: any, ttlMs = 300_000) {
+	IA_CACHE.set(key, { result, expires: Date.now() + ttlMs });
+}
+
+async function detectarCiudadConIA(mensaje: string): Promise<string | null> {
+	const key = `ciudad_${mensaje.toLowerCase().trim()}`;
+	const cached = getCached<string | null>(key);
+	if (cached !== null) return cached;
+
+	try {
+		const respuesta = await generateResponse(
+			`Mensaje: "${mensaje}"
+
+			¿Este mensaje menciona una ciudad, municipio, vereda, corregimiento o departamento de Colombia?
+			Si menciona UNA SOLA ubicación, responde SOLO con el nombre de la ciudad/municipio (sin el departamento).
+			Si menciona ciudad Y departamento, responde SOLO con la ciudad/municipio.
+			Si menciona varias ubicaciones o ninguna, responde SOLO: NO
+
+			Ejemplos:
+			- "soy de bogotá" → bogotá
+			- "vivo en cali valle" → cali
+			- "el peñol nariño" → el peñol
+			- "estoy en ipiales" → ipiales
+			- "busco un congelador" → NO
+			- "quiero un televisor" → NO
+			- "medellín" → medellín
+			- "bogotá cundinamarca" → bogotá`,
+			'Responde ÚNICAMENTE con el nombre de la ciudad o "NO". Sin explicaciones, sin puntuación extra.'
+		);
+
+		const trimmed = respuesta.trim().toLowerCase();
+		const result = (trimmed === 'no' || trimmed.length < 3) ? null : trimmed;
+		setCache(key, result);
+		return result;
+	} catch {
+		return null;
+	}
+}
+
+async function verificarCoberturaConIA(ciudad: string): Promise<'cobertura' | 'sin_cobertura' | 'desconocido'> {
+	const key = `cobertura_${ciudad.toLowerCase().trim()}`;
+	const cached = getCached<'cobertura' | 'sin_cobertura' | 'desconocido'>(key);
+	if (cached) return cached;
+
+	try {
+		const respuesta = await generateResponse(
+			`Ciudad/municipio: "${ciudad}"
+
+			Área de cobertura JLC Electronics:
+			${COBERTURA_DESCRIPCION}
+
+			¿Esta ciudad/municipio está dentro del área de cobertura de JLC Electronics?
+			- Si SÍ tiene cobertura de envío gratis → responde SOLO: SI
+			- Si NO tiene cobertura → responde SOLO: NO
+			- Si no estás seguro o la información es insuficiente → responde SOLO: NO
+
+			IMPORTANTE: Si solo es el nombre del departamento (ej: "nariño", "cauca"), responde SI porque cubrimos departamentos completos.
+			Si es una ciudad de otro departamento no listado (ej: "medellín", "bogotá"), responde NO.`,
+			'Responde ÚNICAMENTE con "SI", "NO" o "DESCONOCIDO". Sin explicaciones.'
+		);
+
+		const trimmed = respuesta.trim().toUpperCase();
+		let result: 'cobertura' | 'sin_cobertura' | 'desconocido';
+		if (trimmed === 'SI') result = 'cobertura';
+		else if (trimmed === 'NO') result = 'sin_cobertura';
+		else result = 'desconocido';
+
+		setCache(key, result, 600_000); // 10 min cache
+		return result;
+	} catch {
+		return 'desconocido';
+	}
 }
 
 // ─── AGENTE BIENVENIDA ────────────────────────────────────────────────────────
@@ -635,10 +747,46 @@ export class VentasAgent implements IAgent {
 			context = { ...context, flujo: 'contado_sin_cobertura', modalidad: 'contado' };
 		}
 
+		// ── Pre-poblar ciudad desde UserData si ya está guardada ─────────────
+		if (!context?.ciudad && context?.userData?.ciudad) {
+			context = {
+				...context,
+				ciudad: context.userData.ciudad,
+				ciudadValidada: true,
+				departamento: context.userData.departamento ?? undefined,
+			};
+		}
+
+		// ── SI ESTAMOS ESPERANDO CIUDAD, procesar primero (PASO 2) ─────────
+		// Esto evita el loop infinito cuando el usuario da una ciudad que no está
+		// en las listas de cobertura (ej: Bogotá) — el fallback message.trim()
+		// captura cualquier texto como ciudad en lugar de preguntar otra vez.
+		if (context?.flujo === 'esperando_ciudad') {
+			const ciudadDetectada = (await extraerCiudadDelMensaje(message)) || message.trim();
+			const cobertura = await verificarCobertura(ciudadDetectada);
+
+			if (cobertura === 'sin_cobertura') {
+				return this.manejarSinCobertura(ciudadDetectada);
+			}
+
+			context = {
+				...context,
+				ciudadValidada: true,
+				ciudad: ciudadDetectada,
+				tieneCobertura: true,
+				flujo: undefined,
+			};
+
+			// Retomar el mensaje original pendiente si existe
+			if (context.pendingMessage) {
+				message = context.pendingMessage;
+			}
+		}
+
 		// ── PASO 1: Validar cobertura si aún no se hizo (mejoras #2 y #4) ─────
 		if (!context?.ciudadValidada) {
 			// Intentar extraer ciudad del mensaje actual
-			const ciudadDetectada = extraerCiudadDelMensaje(message);
+			const ciudadDetectada = await extraerCiudadDelMensaje(message);
 
 			if (!ciudadDetectada) {
 				// No se detectó ciudad → preguntar
@@ -652,7 +800,7 @@ export class VentasAgent implements IAgent {
 				};
 			}
 
-			const cobertura = verificarCobertura(ciudadDetectada);
+			const cobertura = await verificarCobertura(ciudadDetectada);
 
 			if (cobertura === 'sin_cobertura') {
 				return this.manejarSinCobertura(ciudadDetectada);
@@ -678,29 +826,6 @@ export class VentasAgent implements IAgent {
 					tieneCobertura: context.tieneCobertura,
 				},
 			};
-		}
-
-		// ── PASO 2: Si está esperando confirmación de ciudad ──────────────────
-		if (context?.flujo === 'esperando_ciudad') {
-			const ciudadDetectada = extraerCiudadDelMensaje(message) || message.trim();
-			const cobertura = verificarCobertura(ciudadDetectada);
-
-			if (cobertura === 'sin_cobertura') {
-				return this.manejarSinCobertura(ciudadDetectada);
-			}
-
-			context = {
-				...context,
-				ciudadValidada: true,
-				ciudad: ciudadDetectada,
-				tieneCobertura: true,
-				flujo: undefined,
-			};
-
-			// Retomar el mensaje original pendiente si existe
-			if (context.pendingMessage) {
-				message = context.pendingMessage;
-			}
 		}
 
 		// ── PASO 3: Detectar modalidad contado o crédito (mejora #5 y #6) ─────
@@ -831,7 +956,7 @@ ${productosFormateados}`;
 
 // ─── Helper: extraer ciudad de un mensaje ────────────────────────────────────
 
-function extraerCiudadDelMensaje(mensaje: string): string | null {
+async function extraerCiudadDelMensaje(mensaje: string): Promise<string | null> {
 	const lower = mensaje.toLowerCase();
 
 	// Patrones: "soy de X", "estoy en X", "vivo en X", "escribo desde X", "ciudad: X"
@@ -860,6 +985,10 @@ function extraerCiudadDelMensaje(mensaje: string): string | null {
 				w.length > 2 && allCities.some((c) => c.includes(w) || w.includes(c))
 			);
 			if (algunaCoincide) return trimmed;
+
+			// Fallback: si parece una ubicación pero no está en listas, preguntar a Gemini
+			const iaResult = await detectarCiudadConIA(mensaje);
+			if (iaResult) return iaResult;
 		}
 	}
 

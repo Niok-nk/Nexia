@@ -19,11 +19,11 @@ const CIUDADES_CONOCIDAS = [
 	'mocoa', 'puerto asís', 'puerto asis', 'orito', 'sibundoy', 'villagarzón', 'villagarzon',
 	'neiva', 'pitalito', 'garzón', 'garzon', 'campoalegre',
 	'cali', 'buenaventura', 'palmira', 'tuluá', 'tulua', 'buga', 'cartago', 'jamundí', 'jamundi', 'yumbo',
-	'el peñol', 'peñol',
+	'el peñol', 'peñol', 'bogotá', 'bogota',
 ];
 
 const DEPARTAMENTOS_CONOCIDOS = [
-	'nariño', 'narino', 'cauca', 'putumayo', 'huila', 'valle', 'valle del cauca',
+	'nariño', 'narino', 'cauca', 'putumayo', 'huila', 'valle', 'valle del cauca', 'cundinamarca',
 ];
 
 function extraerUbicacion(mensaje: string): { ciudad: string | null; departamento: string | null } {
@@ -212,6 +212,12 @@ export async function handleIncomingMessage(msg: WAMessage): Promise<void> {
 			context.ciudad = userData.ciudad;
 			context.ciudadValidada = true;
 		}
+
+		// Restaurar flujo y pendingMessage desde UserData.extra
+		// para que el agente sepa que estábamos esperando ciudad/producto/etc.
+		const extra = userData.extra ?? null;
+		if (extra?.flujo) context.flujo = extra.flujo;
+		if (extra?.pendingMessage) context.pendingMessage = extra.pendingMessage;
 
 		// 6. Enrutar al orquestador
 		const { agentType, response, metadata } = await orchestrator.route(body, context);
