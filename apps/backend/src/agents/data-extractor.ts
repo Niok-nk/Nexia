@@ -2,27 +2,57 @@ import prisma from '../db/index.js';
 import { generateResponse } from '../utils/gemini.js';
 import logger from '../utils/logger.js';
 
-interface ExtractedData {
-	nombre?: string;
-	cedula?: string;
-	direccion?: string;
-	telefono?: string;
-	presupuesto?: string;
-	productoSolicitado?: string;
-	ciudad?: string;
-	departamento?: string;
-}
+/**
+ * Determina el stage del pipeline basado en los datos reales de UserData y el agente.
+ * Reglas determinísticas, NO depende de la IA.
+ */
+function determinarPipelineStage(userData: Record<string, any>, ultimaRespuesta: string, historial: string): string {
+	// Si la respuesta del asistente contiene instrucciones de pago concretas o confirmación de compra
+	if (/(?:transferencia|consignaci[oó]n|PSE|tarjeta|cuenta de ahorros|cuenta corriente|Nequi|DaviPlata|Banco)\s*(?:\d|\s){4,}/i.test(ultimaRespuesta)) {
+		return 'VENTA_CERRADA';
+	}
 
-interface PipelineAction {
-	stage?: string;
-	type?: string;
+	const tieneNombre = !!userData?.nombre;
+	const tieneCedula = !!userData?.cedula;
+	const tieneDireccion = !!userData?.direccion;
+	const tieneTelefono = !!userData?.telefono;
+	const tieneProducto = !!userData?.productoSolicitado;
+	const tienePresupuesto = !!userData?.presupuesto;
+	const tieneCiudad = !!userData?.ciudad;
+
+	// VENTA_CERRADA: el cliente aceptó comprar, le dimos datos de pago
+	if (tieneNombre && tieneProducto && /comprar|pagar|compra|confirmo|ok|si|d[ée]le|listo|completa|adelante/i.test(historial.slice(-200))) {
+		return 'VENTA_CERRADA';
+	}
+
+	// PRESUPUESTO_LISTO: producto + presupuesto
+	if (tieneProducto && tienePresupuesto) {
+		return 'PRESUPUESTO_LISTO';
+	}
+
+	// CONTACTO_COMPLETO: nombre + cédula + al menos un dato de contacto
+	if (tieneNombre && tieneCedula && (tieneDireccion || tieneTelefono)) {
+		return 'CONTACTO_COMPLETO';
+	}
+
+	// PRODUCTO_INTERES: sabemos qué producto busca
+	if (tieneProducto) {
+		return 'PRODUCTO_INTERES';
+	}
+
+	// CIUDAD_VALIDADA: tenemos ciudad
+	if (tieneCiudad) {
+		return 'CIUDAD_VALIDADA';
+	}
+
+	return 'INITIAL';
 }
 
 /**
  * Agente extractor de datos (IA backend).
  * No habla con el cliente. Lee el historial de la conversación y extrae
- * datos concretos del cliente para guardarlos en UserData, y decide
- * el siguiente paso del pipeline de ventas.
+ * datos concretos para guardarlos en UserData.
+ * El pipeline stage se determina por reglas, no por la IA.
  */
 export async function extractAndSaveData(
 	leadId: string,
@@ -40,19 +70,17 @@ export async function extractAndSaveData(
 			.join('\n');
 
 		const userDataStr = Object.entries(currentUserData)
-			.filter(([_, v]) => v != null && v !== '{}')
+			.filter(([_, v]) => v != null && v !== '' && v !== '{}')
 			.map(([k, v]) => `${k}: ${v}`)
 			.join('\n');
 
-		const prompt = `Eres un extractor de datos de clientes para JLC Electronics. Lees la conversación y extraes información del cliente.
+		// ── 1. Extraer datos del historial con IA ──────────────────────────
+		const prompt = `Eres un extractor de datos de clientes. Lees la conversación y extraes información del cliente.
 
-DATOS ACTUALES EN BASE DE DATOS:
+DATOS ACTUALES:
 ${userDataStr || '(ninguno)'}
 
-ÚLTIMA RESPUESTA DEL ASISTENTE:
-${responseText}
-
-HISTORIAL DE LA CONVERSACIÓN:
+HISTORIAL:
 ${historial}
 
 --- INSTRUCCIONES ---
@@ -64,38 +92,25 @@ Campos a extraer (solo si están EXPLÍCITAMENTE en la conversación):
 - direccion: dirección que mencionó
 - telefono: teléfono que mencionó
 - presupuesto: presupuesto o cantidad que dijo estar dispuesto a pagar
-- productoSolicitado: producto que busca (nevera, televisor, lavadora, repuesto específico, etc.)
+- productoSolicitado: producto que busca (nevera, televisor, lavadora, repuesto, etc.)
 - ciudad: ciudad donde está
 - departamento: departamento donde está
 
-Además, determina el AVANCE DEL PIPELINE según la conversación:
-- "INITIAL": primer contacto, saludo
-- "CIUDAD_VALIDADA": ya tenemos ciudad y departamento
-- "PRODUCTO_INTERES": ya sabemos qué producto busca
-- "CONTACTO_COMPLETO": tenemos nombre + cédula + dirección + teléfono
-- "PRESUPUESTO_LISTO": tenemos producto y presupuesto
-- "VENTA_CERRADA": aceptó comprar, dimos instrucciones de pago
-- "RECHAZADO": dijo que no le interesa o no quiere comprar
+Responde SOLO con JSON válido, sin markdown ni explicaciones:
+{"datos":{}}
 
-Responde SOLO con JSON válido en este formato exacto, sin explicaciones ni markdown:
-{
-  "datos": { "nombre": null, "cedula": null, "direccion": null, "telefono": null, "presupuesto": null, "productoSolicitado": null, "ciudad": null, "departamento": null },
-  "pipeline": { "stage": null, "type": "CONSULTA" }
-}
-
-Solo incluye campos con valor. Si no hay datos nuevos, devuelve objetos vacíos.`;
+Ejemplo: {"datos":{"nombre":"Carlos","ciudad":"Medellín"}}
+Si no hay datos nuevos: {"datos":{}}`;
 
 		const raw = await generateResponse(prompt);
 		const jsonStr = raw.replace(/```json\s*|\s*```/g, '').trim();
 		const parsed = JSON.parse(jsonStr);
+		const datos: Record<string, string> = parsed.datos || {};
 
-		const datos: ExtractedData = parsed.datos || {};
-		const pipeline: PipelineAction = parsed.pipeline || {};
-
-		// Construir update de UserData solo con campos nuevos
+		// ── 2. Guardar solo campos nuevos en UserData ──────────────────────
 		const updateData: Record<string, any> = {};
 		for (const [key, value] of Object.entries(datos)) {
-			if (value && value !== currentUserData[key]) {
+			if (value && String(value) !== String(currentUserData[key] ?? '')) {
 				updateData[key] = String(value);
 			}
 		}
@@ -109,21 +124,30 @@ Solo incluye campos con valor. Si no hay datos nuevos, devuelve objetos vacíos.
 			logger.info({ leadId, updateData }, 'DataExtractor: UserData actualizado');
 		}
 
-		// Avanzar pipeline si corresponde
-		if (pipeline.stage && pipeline.stage !== currentUserData.stage) {
-			const validStages = ['INITIAL', 'CIUDAD_VALIDADA', 'PRODUCTO_INTERES', 'CONTACTO_COMPLETO', 'PRESUPUESTO_LISTO', 'VENTA_CERRADA', 'RECHAZADO'];
-			if (validStages.includes(pipeline.stage)) {
-				await prisma.lead.update({
-					where: { id: leadId },
-					data: {
-						stage: pipeline.stage,
-						...(pipeline.type ? { type: pipeline.type } : {}),
-					},
-				});
-				logger.info({ leadId, stage: pipeline.stage, type: pipeline.type }, 'DataExtractor: Pipeline actualizado');
-			}
+		// ── 3. Leer UserData actualizada de la DB para pipeline ────────────
+		const freshUserData = await prisma.userData.findUnique({ where: { leadId } });
+		const merged = { ...currentUserData, ...updateData, ...(freshUserData || {}) };
+
+		// ── 4. Determinar pipeline stage por reglas (determinístico) ───────
+		const stage = determinarPipelineStage(merged, responseText, historial);
+
+		// Leer lead actual para no retroceder
+		const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+		if (!lead) return;
+
+		const stages = ['INITIAL', 'CIUDAD_VALIDADA', 'PRODUCTO_INTERES', 'CONTACTO_COMPLETO', 'PRESUPUESTO_LISTO', 'VENTA_CERRADA', 'RECHAZADO'];
+		const idxActual = stages.indexOf(lead.stage);
+		const idxNuevo = stages.indexOf(stage);
+
+		// Solo avanzar, nunca retroceder
+		if (idxNuevo > idxActual) {
+			await prisma.lead.update({
+				where: { id: leadId },
+				data: { stage },
+			});
+			logger.info({ leadId, stageAnterior: lead.stage, stageNuevo: stage }, 'DataExtractor: Pipeline avanzado');
 		}
 	} catch (error) {
-		logger.error({ error, leadId }, 'DataExtractor: Error extrayendo datos');
+		logger.error({ error, leadId }, 'DataExtractor: Error (no crítico)');
 	}
 }
