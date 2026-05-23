@@ -103,7 +103,12 @@ Ejemplo: {"datos":{"nombre":"Carlos","ciudad":"Medellín"}}
 Si no hay datos nuevos: {"datos":{}}`;
 
 		const raw = await generateResponse(prompt);
-		const jsonStr = raw.replace(/```json\s*|\s*```/g, '').trim();
+		// Extraer solo el JSON del texto (buscar primer { y último })
+		const jsonStart = raw.indexOf('{');
+		const jsonEnd = raw.lastIndexOf('}');
+		const jsonStr = jsonStart >= 0 && jsonEnd > jsonStart
+			? raw.slice(jsonStart, jsonEnd + 1).trim()
+			: raw.replace(/```json\s*|\s*```/g, '').trim();
 		const parsed = JSON.parse(jsonStr);
 		const datos: Record<string, string> = parsed.datos || {};
 
@@ -147,7 +152,7 @@ Si no hay datos nuevos: {"datos":{}}`;
 			});
 			logger.info({ leadId, stageAnterior: lead.stage, stageNuevo: stage }, 'DataExtractor: Pipeline avanzado');
 		}
-	} catch (error) {
-		logger.error({ error, leadId }, 'DataExtractor: Error (no crítico)');
+	} catch (error: any) {
+		logger.error({ err: error, leadId, msg: error?.message || String(error) }, 'DataExtractor: Error (no crítico)');
 	}
 }

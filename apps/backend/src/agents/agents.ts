@@ -55,7 +55,7 @@ function buildCategoriaPatterns(): RegExp {
 	// Escapar caracteres especiales para regex
 	const escapar = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 	const pattern = unicos.map(s => escapar(s)).join('|');
-	return new RegExp(`(?:${pattern})\\b`, 'i');
+	return new RegExp(`\\b(?:${pattern})\\b`, 'i');
 }
 
 const CATEGORIAS_RE = buildCategoriaPatterns();
