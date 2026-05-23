@@ -288,6 +288,28 @@ interface FewShotExample {
 	asistente: string;
 }
 
+function buildUserDataContext(userData?: Record<string, any> | null): string {
+	if (!userData) return '';
+	const campos = ['nombre', 'cedula', 'direccion', 'telefono', 'presupuesto', 'productoSolicitado', 'ciudad', 'departamento'];
+	const parts = campos
+		.filter((k) => userData[k] != null && userData[k] !== '')
+		.map((k) => {
+			const labels: Record<string, string> = {
+				nombre: 'Nombre',
+				cedula: 'Cédula',
+				direccion: 'Dirección',
+				telefono: 'Teléfono',
+				presupuesto: 'Presupuesto',
+				productoSolicitado: 'Producto que busca',
+				ciudad: 'Ciudad',
+				departamento: 'Departamento',
+			};
+			return `${labels[k] || k}: ${userData[k]}`;
+		});
+	if (parts.length === 0) return '';
+	return `\nDATOS DEL CLIENTE (ya recolectados):\n${parts.join('\n')}\n`;
+}
+
 function buildGemmaPrompt(opts: {
 	instruccion: string;
 	ejemplos: FewShotExample[];
@@ -1243,11 +1265,13 @@ export class VentasAgent implements IAgent {
 			}).join('\n\n')
 			: 'No se encontraron productos.';
 
+		const userDataStr = buildUserDataContext(context?.userData);
+
 		const { system, user } = buildGemmaPrompt({
 			instruccion: `Eres ${AGENT_NAME}, asesora comercial de JLC Electronics Colombia.
 Tu tono es cálido, claro y directo. Hablas en español colombiano.
 ${ciudadStr} ${envioStr}.
-
+${userDataStr}
 REGLAS:
 - El cliente busca un producto. Usa el CATÁLOGO para recomendar lo más relevante.
 - Menciona máximo 1-2 productos con su nombre y enlace.
@@ -1257,6 +1281,7 @@ REGLAS:
 - No compartas datos de agencias físicas.
 - Responde en máximo 3 líneas, sin asteriscos ni formato.
 - CAPTURA Y REGISTRA automáticamente cualquier dato personal que el cliente mencione: nombre, cédula, dirección, teléfono, presupuesto. No los pidas de nuevo si ya fueron mencionados.
+- Siempre revisa los DATOS DEL CLIENTE antes de responder. Si ya sabes su ciudad, producto o presupuesto, úsalos para personalizar tu respuesta.
 - Si el cliente cambia de tema (ej: pregunta por cartera, garantías), redirecto suavemente al flujo de compra activo: "Entiendo, pero antes déjame ayudarte a terminar tu compra. ¿Quieres continuar?" Solo transferir si el cliente insiste.`,
 			ejemplos: [
 				{
@@ -1350,11 +1375,12 @@ export class CarteraAgent implements IAgent {
 	name = 'Cartera';
 
 	async handle(message: string, context: any): Promise<AgentResponse> {
+		const userDataCtx = buildUserDataContext(context?.userData);
 		const datos = `Canales oficiales de cartera y facturación:
 - WhatsApp cartera: +57 314 422 9949 y +57 315 721 2367
 - Línea telefónica: +57 320 788 1108 (horario: 12:30 p.m. a 2:30 p.m., lunes a viernes)
 - Correo peticiones con soportes: callcenter5@electromillonaria.co
-Desde este chat no se puede acceder a información personal del cliente.`;
+Desde este chat no se puede acceder a información personal del cliente.${userDataCtx}`;
 
 		const { system, user } = buildGemmaPrompt({
 			instruccion: `Eres asistente de cartera de Electrodomésticos JLC. Tu rol es dar directamente los canales oficiales para que el cliente resuelva su consulta de forma inmediata. No prometas que "un asesor te llamará". Datos: ${datos}`,
@@ -1403,7 +1429,8 @@ export class ServicioTecnicoAgent implements IAgent {
 	name = 'Servicio Técnico';
 
 	async handle(message: string, context: any): Promise<AgentResponse> {
-		const datos = `Canales de servicio técnico JLC:
+		const userDataCtx = buildUserDataContext(context?.userData);
+		const datos = `Canales de servicio técnico JLC:${userDataCtx}
 - WhatsApp técnico: +57 320 788 1151
 - WhatsApp técnico (Diego): +57 320 788 1110
 - Web: https://jlc-electronics.com/servicio-tecnico/
@@ -1511,7 +1538,8 @@ export class RepuestosAgent implements IAgent {
 			// continuar sin catálogo
 		}
 
-		const datos = `Repuesto solicitado: "${repuestoData.repuesto}". Referencia equipo: "${repuestoData.referencia}". Solicitante: ${repuestoData.nombreCliente}.
+		const userDataCtx = buildUserDataContext(context?.userData);
+		const datos = `Repuesto solicitado: "${repuestoData.repuesto}". Referencia equipo: "${repuestoData.referencia}". Solicitante: ${repuestoData.nombreCliente}.${userDataCtx}
 Sin stock: tiempo de pedido 3 a 5 días hábiles. Web: https://jlc-electronics.com/.${productInfo ? ` Repuestos encontrados: ${productInfo}` : ' No se encontraron repuestos en catálogo en este momento.'}
 Instrucción: indica al cliente que su solicitud fue registrada y que será respondida para confirmar disponibilidad y precio. Si hay repuestos en catálogo, mencionarlos. Pedirle que envíe foto del equipo si puede para confirmar la referencia exacta.`;
 
@@ -1548,7 +1576,8 @@ export class VacantesAgent implements IAgent {
 	name = 'Vacantes';
 
 	async handle(message: string, context: any): Promise<AgentResponse> {
-		const datos = `No hay listado de vacantes cargado actualmente. El interesado deja sus datos para quedar en base de datos: nombre completo, cargo de interés, ciudad. Puede enviar hoja de vida.`;
+		const userDataCtx = buildUserDataContext(context?.userData);
+		const datos = `No hay listado de vacantes cargado actualmente. El interesado deja sus datos para quedar en base de datos: nombre completo, cargo de interés, ciudad. Puede enviar hoja de vida.${userDataCtx}`;
 
 		const { system, user } = buildGemmaPrompt({
 			instruccion: `Eres asistente de recursos humanos de Electrodomésticos JLC. Atiendes a personas interesadas en trabajar en la empresa. Datos: ${datos}`,
@@ -1584,7 +1613,8 @@ export class DistribuidoresAgent implements IAgent {
 	name = 'Distribuidores';
 
 	async handle(message: string, context: any): Promise<AgentResponse> {
-		const datos = `Datos a recolectar paso a paso: 1. NIT, 2. Nombre o razón social, 3. Teléfono, 4. Correo, 5. Rango de ventas estimado, 6. Departamento, 7. Ciudad. Pedir uno o dos por mensaje, no todos de golpe.`;
+		const userDataCtx = buildUserDataContext(context?.userData);
+		const datos = `Datos a recolectar paso a paso: 1. NIT, 2. Nombre o razón social, 3. Teléfono, 4. Correo, 5. Rango de ventas estimado, 6. Departamento, 7. Ciudad. Pedir uno o dos por mensaje, no todos de golpe.${userDataCtx}`;
 
 		const { system, user } = buildGemmaPrompt({
 			instruccion: `Eres asistente del programa de distribuidores de Electrodomésticos JLC. Atiendes a interesados en ser distribuidores autorizados. Recolecta los datos de forma amable, de a poco. Datos: ${datos}`,
@@ -1628,7 +1658,8 @@ export class PagosAgent implements IAgent {
 	name = 'Medios de Pago';
 
 	async handle(message: string, context: any): Promise<AgentResponse> {
-		const datos = `Medios de pago JLC Electronics:
+		const userDataCtx = buildUserDataContext(context?.userData);
+		const datos = `Medios de pago JLC Electronics:${userDataCtx}
 1) En línea en https://jlc-electronics.com/ con PSE, tarjeta de crédito o débito.
 2) En punto físico (el asesor indica la tienda más cercana según ciudad).
 3) Crédito / cuotas: gestionado por Cristina al WhatsApp +57 318 740 8190.
