@@ -1197,9 +1197,10 @@ export class VentasAgent implements IAgent {
 
 		if (context?.flujo === 'perfilando_producto') {
 			// Pregunta 1 ya fue hecha → procesar respuesta de tamaño
-			const tamanoMencionado = message.match(/(\d+)\s*(?:pulgadas|pulg|lt|litros|kg|kilos)/i);
-			if (tamanoMencionado) {
-				context = { ...context, tamanoPerfil: tamanoMencionado[0], flujo: 'perfilando_presupuesto' };
+			const tamanoNumerico = message.match(/(\d+)\s*(?:pulgadas|pulg|lt|litros|kg|kilos)/i);
+			const tamanoCualitativo = /(?:grande|pequeñ[oa]|mediano|mediana|normal|est[aá]ndar|chico|chica|enano|compacto|mini|pro|profesional|port[aá]til|de\s*mesa|de\s*piso|de\s*pie|horizontal|vertical|inoxidable|acero)/i.test(message);
+			if (tamanoNumerico || tamanoCualitativo) {
+				context = { ...context, tamanoPerfil: tamanoNumerico?.[0] || message.trim(), flujo: 'perfilando_presupuesto' };
 				return {
 					response: '¿Tienes un presupuesto aproximado en mente? Así te recomiendo lo que mejor se ajuste.',
 					metadata: {
