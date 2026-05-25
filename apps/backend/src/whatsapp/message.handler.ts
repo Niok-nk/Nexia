@@ -1,6 +1,7 @@
 import { WAMessage } from '@whiskeysockets/baileys';
 import prisma from '../db/index.js';
 import { orchestrator } from '../agents/orchestrator.js';
+import { extractAndSaveData } from '../agents/data-extractor.js';
 import { sendMessage, getStatus, resolvePhoneFromJid } from './whatsapp.js';
 import logger from '../utils/logger.js';
 
@@ -269,6 +270,9 @@ export async function processIncomingMessage(
 	if (extra?.flujo && typeof extra.flujo === 'string') context.flujo = extra.flujo;
 	if (extra?.pendingMessage) context.pendingMessage = extra.pendingMessage;
 	if (extra?.ultimaBusqueda) context.ultimaBusqueda = extra.ultimaBusqueda;
+	if (extra?.perfilState) context.perfilState = extra.perfilState;
+	if (typeof extra?.tieneCobertura === 'boolean') context.tieneCobertura = extra.tieneCobertura;
+	if (extra?.modalidad) context.modalidad = extra.modalidad;
 
 	// 6. Enrutar al orquestador
 	const { agentType, response, metadata } = await orchestrator.route(body, context);
@@ -339,6 +343,7 @@ export async function processIncomingMessage(
 		if (repuesto?.repuesto) ud.productoSolicitado = repuesto.repuesto;
 
 		if (metadata?.productoCompra) ud.productoSolicitado = metadata.productoCompra;
+		if (metadata?.productoSolicitado && !ud.productoSolicitado) ud.productoSolicitado = metadata.productoSolicitado;
 
 		// Datos personales continuos (nombre, cédula, dirección, teléfono, presupuesto)
 		if (metadata?.nombreCliente) ud.nombre = metadata.nombreCliente;
@@ -364,6 +369,19 @@ export async function processIncomingMessage(
 				create: { leadId: lead.id, extra: JSON.stringify(mergedExtra) },
 			});
 		}
+
+		// 10. IA extractora de datos (post-procesamiento)
+		// Analiza el historial completo y extrae datos del cliente que el
+		// agente conversacional pudo haber omitido. También mueve el pipeline.
+		extractAndSaveData(
+			lead.id,
+			contact.id,
+			body,
+			history.map((m) => ({ direction: m.direction, body: m.body, sentAt: m.sentAt })),
+			userData,
+			agentType,
+			response
+		).catch(e => logger.error({ error: e.message }, 'DataExtractor falló (no crítico)'));
 	}
 
 	return { response, agentType, contactId: contact.id, leadId: lead?.id };
