@@ -122,13 +122,17 @@ router.post('/chat', async (req: Request, res: Response) => {
 	try {
 		const { response, agentType } = await processIncomingMessage(phone, message);
 
+		// Usar realPhone del contacto para enviar (puede ser un LID)
+		const contact = await prisma.contact.findUnique({ where: { phone } }).catch(() => null);
+		const sendTo = contact?.realPhone || phone;
+
 		const waStatus = getStatus();
-		logger.info({ waStatus, phone }, 'WhatsApp send check');
+		logger.info({ waStatus, phone, sendTo }, 'WhatsApp send check');
 		try {
-			await sendMessage(phone, response);
-			logger.info({ phone }, 'Message sent via WhatsApp');
+			await sendMessage(sendTo, response);
+			logger.info({ phone, sendTo }, 'Message sent via WhatsApp');
 		} catch (err) {
-			logger.warn({ error: err, phone, waStatus }, 'WhatsApp send failed (may be disconnected)');
+			logger.warn({ error: err, phone, sendTo, waStatus }, 'WhatsApp send failed');
 		}
 
 		res.json({ success: true, message: response, agentType });
@@ -151,11 +155,14 @@ router.post('/test', requireAuth, async (req: Request, res: Response) => {
 	try {
 		const { response, agentType, contactId, leadId } = await processIncomingMessage(phone, message);
 
-		// Enviar respuesta por WhatsApp (intentar aunque no esté marcado como 'connected')
+		// Usar realPhone del contacto para enviar
+		const contact = await prisma.contact.findUnique({ where: { phone } }).catch(() => null);
+		const sendTo = contact?.realPhone || phone;
+
 		try {
-			await sendMessage(phone, response);
+			await sendMessage(sendTo, response);
 		} catch (err) {
-			logger.warn({ error: err, phone }, 'Failed to send WhatsApp response');
+			logger.warn({ error: err, phone, sendTo }, 'Failed to send WhatsApp response');
 		}
 
 		res.json({
