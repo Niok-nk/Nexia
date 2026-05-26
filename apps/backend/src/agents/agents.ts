@@ -1050,8 +1050,7 @@ interface CreditoStep {
 // ─── PASOS DEL FORMULARIO DE CRÉDITO ─────────────────────────────────────────
 
 const CREDITO_STEPS: CreditoStep[] = [
-	{ field: 'nombres',            pregunta: '¿Cuál es tu nombre?' },
-	{ field: 'apellidos',          pregunta: '¿Y tus apellidos?' },
+	{ field: 'nombres',            pregunta: '¿Cuáles son tus nombres?' },
 	{ field: 'cedula',             pregunta: '¿Cuál es tu número de cédula de ciudadanía?' },
 	{ field: 'celular',            pregunta: '¿Cuál es tu número de celular?' },
 	{ field: 'direccion',          pregunta: '¿Cuál es tu dirección de residencia y barrio?' },
