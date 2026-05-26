@@ -335,18 +335,37 @@ export const initWhatsApp = async (forceNewSession = false, isInternalReconnect 
 			}
 		});
 
+		// Deduplicación de mensajes entrantes (evita bucles por re-emisión de Baileys)
+		const processedIds = new Set<string>();
+		const MAX_PROCESSED = 500;
+		setInterval(() => {
+			if (processedIds.size > MAX_PROCESSED) processedIds.clear();
+		}, 60000).unref();
+
 		client.ev.on('messages.upsert', async (m) => {
 			if (m.type === 'notify') {
 				for (const msg of m.messages) {
 					// Ignorar si no tiene mensaje o fue enviado por nosotros mismos
 					if (!msg.message) continue;
 					if (msg.key.fromMe) continue;
+					// Ignorar mensajes mientras se está reconectando
+					if (isReconnecting) {
+						logger.info('Skipping message during reconnection');
+						continue;
+					}
 					
 					const remoteJid = msg.key.remoteJid || '';
 					// Ignorar grupos y newsletters
 					if (remoteJid.endsWith('@g.us') || remoteJid.endsWith('@newsletter')) {
 						continue;
 					}
+
+					// Ignorar si ya procesamos este mensaje (evita duplicados por reconexión)
+					if (msg.key.id && processedIds.has(msg.key.id)) {
+						logger.info({ msgId: msg.key.id }, 'Skipping already processed message');
+						continue;
+					}
+					if (msg.key.id) processedIds.add(msg.key.id);
 					
 					logger.info({ msgId: msg.key.id, from: remoteJid }, 'Passing message to handler');
 					await handleIncomingMessage(msg);
