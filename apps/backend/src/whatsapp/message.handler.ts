@@ -86,9 +86,9 @@ export async function handleIncomingMessage(msg: WAMessage): Promise<void> {
 		return;
 	}
 	
-	// Ignorar mensajes de grupos
-	if (remoteJid.endsWith('@g.us')) {
-		logger.info('Ignoring group message');
+	// Ignorar mensajes de grupos y broadcasts
+	if (remoteJid.endsWith('@g.us') || remoteJid.endsWith('@broadcast')) {
+		logger.info({ remoteJid }, 'Ignoring group or broadcast message');
 		return;
 	}
 
@@ -126,11 +126,12 @@ export async function handleIncomingMessage(msg: WAMessage): Promise<void> {
 
 		// 10. Enviar respuesta por WhatsApp (intentar aunque el status no sea 'connected')
 		//     Baileys puede recibir mensajes incluso cuando isReady = false
+		const sendTo = realPhone || phone;
 		try {
-			await sendMessage(phone, response);
-			logger.info({ phone, agentType }, 'Response sent');
+			await sendMessage(sendTo, response);
+			logger.info({ phone, realPhone, sendTo, agentType }, 'Response sent');
 		} catch (err) {
-			logger.warn({ phone, agentType, error: err }, 'Failed to send WhatsApp response');
+			logger.warn({ phone, sendTo, agentType, error: err }, 'Failed to send WhatsApp response');
 		}
 	} catch (error) {
 		logger.error({ error, phone }, 'Error handling incoming message');
@@ -138,7 +139,7 @@ export async function handleIncomingMessage(msg: WAMessage): Promise<void> {
 		// Intentar enviar mensaje de error al usuario
 		try {
 			const fallbackResponse = 'Lo siento, hubo un problema procesando tu mensaje. Por favor intenta de nuevo en un momento.';
-			await sendMessage(phone, fallbackResponse);
+			await sendMessage(realPhone || phone, fallbackResponse);
 
 				// Intentar buscar el contacto y persistir la respuesta de error de fallback en BD
 			const contact = await prisma.contact.findUnique({
