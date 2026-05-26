@@ -225,11 +225,20 @@ Categoría:`;
 	): Promise<{ agentType: string; response: string; metadata?: Record<string, any> }> {
 		const hasHistory = Array.isArray(context?.history) && context.history.length > 0;
 
+		// ─── SALIDA DE EMERGENCIA (ESCAPE HATCH) ───
+		// Si el usuario quiere cancelar o cambiar de tema, rompemos cualquier flujo activo
+		const esEscape = /\b(?:cancelar|salir|volver|inicio|men[uú]|asesor|humano|otra cosa|ya no|no quiero)\b/i.test(message);
+		let flujoActivo = context?.flujo;
+		
+		if (esEscape) {
+			flujoActivo = null; // Romper el bucle
+			if (context) context.flujo = null;
+		}
+
 		// Si hay un flujo activo en el contexto, respetar el agente actual
 		// para no interrumpir procesos en curso (crédito, repuestos, etc.)
 		let intent: IntentKey;
 
-		const flujoActivo = context?.flujo;
 		if (flujoActivo) {
 			// Mapear flujo activo al agente correspondiente
 			if (/^credito/.test(flujoActivo) || flujoActivo === 'sin_cobertura' || flujoActivo === 'contado_sin_cobertura' || flujoActivo === 'esperando_ciudad' || flujoActivo === 'credito_perfilando' || flujoActivo === 'esperando_modalidad' || flujoActivo === 'perfilando_producto' || flujoActivo === 'perfilando_presupuesto' || flujoActivo === 'perfilando' || flujoActivo === 'seleccion_pago' || flujoActivo === 'pago_web' || flujoActivo === 'pago_web_paso' || flujoActivo === 'pago_medios' || flujoActivo === 'pago_fisico') {
