@@ -367,13 +367,13 @@ input:focus, textarea:focus, select:focus {
 }
 
 /* Stage badges */
-.badge-INITIAL    { background: rgba(106,114,128,0.2); color: var(--stage-initial); }
-.badge-QUALIFIED  { background: rgba(90,122,154,0.2);  color: var(--stage-qualified); }
-.badge-PROPOSAL   { background: rgba(122,106,138,0.2); color: var(--stage-proposal); }
-.badge-NEGOTIATION{ background: rgba(138,112,90,0.2);  color: var(--stage-negotiation); }
-.badge-WON        { background: rgba(90,138,106,0.2);  color: var(--stage-won); }
-.badge-LOST       { background: rgba(138,90,90,0.2);   color: var(--stage-lost); }
-.badge-ON_HOLD    { background: rgba(138,133,112,0.2);  color: var(--stage-on-hold); }
+.badge-INITIAL           { background: rgba(106,114,128,0.2); color: var(--stage-initial); }
+.badge-CIUDAD_VALIDADA   { background: rgba(90,122,154,0.2);  color: var(--stage-qualified); }
+.badge-PRODUCTO_INTERES  { background: rgba(122,106,138,0.2); color: var(--stage-proposal); }
+.badge-CONTACTO_COMPLETO { background: rgba(138,112,90,0.2);  color: var(--stage-negotiation); }
+.badge-PRESUPUESTO_LISTO { background: rgba(138,133,112,0.2);  color: var(--stage-on-hold); }
+.badge-VENTA_CERRADA     { background: rgba(90,138,106,0.2);  color: var(--stage-won); }
+.badge-RECHAZADO         { background: rgba(138,90,90,0.2);   color: var(--stage-lost); }
 
 /* Module badges */
 .badge-VENTAS           { background: rgba(90,138,106,0.15);  color: var(--mod-ventas); }

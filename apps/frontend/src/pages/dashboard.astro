@@ -61,8 +61,13 @@ import Layout from '../layouts/Layout.astro';
 
   function stageLabel(s: string) {
     const m: Record<string, string> = {
-      INITIAL: 'Nuevo', QUALIFIED: 'Calificado', PROPOSAL: 'Propuesta',
-      NEGOTIATION: 'Negociación', WON: 'Ganado', LOST: 'Perdido', ON_HOLD: 'En espera',
+      INITIAL: 'Nuevo',
+      CIUDAD_VALIDADA: 'Ciudad Validada',
+      PRODUCTO_INTERES: 'Interés Producto',
+      CONTACTO_COMPLETO: 'Contacto Completo',
+      PRESUPUESTO_LISTO: 'Presupuesto Listo',
+      VENTA_CERRADA: 'Venta Cerrada',
+      RECHAZADO: 'Rechazado',
     };
     return m[s] || s;
   }
@@ -78,8 +83,8 @@ import Layout from '../layouts/Layout.astro';
 
       // Stats
       document.getElementById('stat-contacts')!.textContent = String(contacts.length);
-      document.getElementById('stat-leads')!.textContent = String(leads.filter((l: any) => l.stage !== 'WON' && l.stage !== 'LOST').length);
-      document.getElementById('stat-won')!.textContent = String(leads.filter((l: any) => l.stage === 'WON').length);
+      document.getElementById('stat-leads')!.textContent = String(leads.filter((l: any) => l.stage !== 'VENTA_CERRADA' && l.stage !== 'RECHAZADO').length);
+      document.getElementById('stat-won')!.textContent = String(leads.filter((l: any) => l.stage === 'VENTA_CERRADA').length);
 
       // Messages count (via leads messages)
       const today = new Date().toDateString();

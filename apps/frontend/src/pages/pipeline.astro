@@ -13,13 +13,13 @@ import Layout from '../layouts/Layout.astro';
   const headers = { Authorization: `Bearer ${token}` };
 
   const STAGES = [
-    { key: 'INITIAL',     label: 'Nuevos',       color: 'var(--stage-initial)' },
-    { key: 'QUALIFIED',   label: 'Calificados',   color: 'var(--stage-qualified)' },
-    { key: 'PROPOSAL',    label: 'Propuesta',     color: 'var(--stage-proposal)' },
-    { key: 'NEGOTIATION', label: 'Negociación',   color: 'var(--stage-negotiation)' },
-    { key: 'WON',         label: 'Ganados',    color: 'var(--stage-won)' },
-    { key: 'LOST',        label: 'Perdidos',   color: 'var(--stage-lost)' },
-    { key: 'ON_HOLD',     label: 'En espera',  color: 'var(--stage-on-hold)' },
+    { key: 'INITIAL',           label: 'Nuevos',            color: 'var(--stage-initial)' },
+    { key: 'CIUDAD_VALIDADA',   label: 'Ciudad Validada',    color: 'var(--stage-qualified)' },
+    { key: 'PRODUCTO_INTERES',  label: 'Interés Producto',   color: 'var(--stage-proposal)' },
+    { key: 'CONTACTO_COMPLETO', label: 'Contacto Completo',  color: 'var(--stage-negotiation)' },
+    { key: 'PRESUPUESTO_LISTO', label: 'Presupuesto Listo',  color: 'var(--stage-on-hold)' },
+    { key: 'VENTA_CERRADA',     label: 'Venta Cerrada',      color: 'var(--stage-won)' },
+    { key: 'RECHAZADO',         label: 'Rechazados',         color: 'var(--stage-lost)' },
   ];
 
   function fmtPhone(p: string) {

@@ -25,13 +25,26 @@ const { id } = Astro.params;
   }
   function stageLabel(s) {
     const m = {
-      INITIAL:'Nuevo', QUALIFIED:'Calificado', PROPOSAL:'Propuesta',
-      NEGOTIATION:'Negociación', WON:'Ganado', LOST:'Perdido', ON_HOLD:'En espera',
+      INITIAL: 'Nuevo',
+      CIUDAD_VALIDADA: 'Ciudad Validada',
+      PRODUCTO_INTERES: 'Interés Producto',
+      CONTACTO_COMPLETO: 'Contacto Completo',
+      PRESUPUESTO_LISTO: 'Presupuesto Listo',
+      VENTA_CERRADA: 'Venta Cerrada',
+      RECHAZADO: 'Rechazado',
     };
     return m[s] || s;
   }
 
-  const STAGE_OPTIONS = ['INITIAL','QUALIFIED','PROPOSAL','NEGOTIATION','WON','LOST','ON_HOLD'];
+  const STAGE_OPTIONS = [
+    'INITIAL',
+    'CIUDAD_VALIDADA',
+    'PRODUCTO_INTERES',
+    'CONTACTO_COMPLETO',
+    'PRESUPUESTO_LISTO',
+    'VENTA_CERRADA',
+    'RECHAZADO',
+  ];
 
   async function changeStage(leadId, stage) {
     await fetch(`${API}/leads/${leadId}/stage`, {
