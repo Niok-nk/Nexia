@@ -506,7 +506,7 @@ function cleanResponse(raw: string): string {
 	text = text.replace(/^Checking\s+constraints:[\s\S]*?(?=\n(?:Sí|¡Claro|Tenemos|Esa|La|Perfecto|\d+\.|[\wÁÉÍÓÚÑ]))/i, '').trim();
 	text = text.replace(/^(?:Option|Opción)\s+\d+\s*:\s*[^\n]*/im, '').trim();
 	text = text.replace(/\n(?:Option|Opción)\s+\d+\s*:\s*[^\n]*/gi, '').trim();
-	text = text.replace(/\d+\s*lines?\s*max\??\s*:\s*yes|no|sí|si/gi, '').trim();
+	text = text.replace(/\d+\s*lines?\s*max\??\s*:\s*(?:yes|no|sí|si)/gi, '').trim();
 	text = text.replace(/(?:max|máx)\s*\d+\s*(?:lines|palabras|productos)\??\s*\??\s*(?:yes|no|sí|si)/gi, '').trim();
 
 	// 5b) Quitar auto-rezonamiento en inglés (modelo probando respuestas)
@@ -1421,7 +1421,7 @@ export class VentasAgent implements IAgent {
 		}
 
 		// ── PASO 4: Detectar intención de compra ─────────────────────────────
-		const quiereComprar = /\b(?:comprar(?:lo|la)?|lo quiero|la quiero|quiero esa|quiero este|quiero comprar|c[oó]mo (?:compro|hago|puedo pagar|le hago|le hago para pagar)|quiero pagar|proceder|concretar|compralo|c[oó]mpralo|reservar|apartar|d[áa]le|confirmo compra|ya lo quiero)\b|\bcompr(?:o|ar)\s+(?:esa|este|ese)\b/i.test(message);
+		const quiereComprar = /\b(?:comprar(?:lo|la)?|lo quiero|la quiero|quiero esa|quiero este|quiero comprar|c[oó]mo (?:compro|hago|puedo pagar|le hago|le hago para pagar)|quiero pagar|proceder|concretar|compralo|c[oó]mpralo|reservar|apartar|d[áa]le|confirmo compra|ya lo quiero)\b|\bcompr(?:o|ar)\s+(?:esa|este|ese)\b|\b(?:el de \d+|el primero|el segundo|me quedo con|me interesa el|prefiero el)\b/i.test(message);
 
 		if (quiereComprar && context?.modalidad === 'contado') {
 			const tieneCobertura = context?.tieneCobertura;
@@ -1433,22 +1433,29 @@ export class VentasAgent implements IAgent {
 			const ultimosProductos = context?.ultimaBusqueda?.results ?? [];
 			let productoSolicitado: string | undefined;
 			let productoURL: string | undefined;
+			let pPrice: string | undefined;
 			if (ultimosProductos.length === 1) {
 				productoSolicitado = ultimosProductos[0].name;
 				productoURL = ultimosProductos[0].permalink;
+				pPrice = ultimosProductos[0].price;
 			} else if (ultimosProductos.length > 1) {
 				const lowerMsg = message.toLowerCase();
 				const match = ultimosProductos.find((p: any) =>
 					p.name.toLowerCase().includes(lowerMsg) ||
-					lowerMsg.includes(p.name.toLowerCase().slice(0, 20))
+					lowerMsg.includes(p.name.toLowerCase().slice(0, 20)) ||
+					(lowerMsg.includes('900w') && p.name.toLowerCase().includes('900w')) ||
+					(lowerMsg.includes('700w') && p.name.toLowerCase().includes('700w')) ||
+					(lowerMsg.includes('primero') && ultimosProductos[0] === p) ||
+					(lowerMsg.includes('segundo') && ultimosProductos[1] === p)
 				);
 				const selected = match ?? ultimosProductos[0];
 				productoSolicitado = selected.name;
 				productoURL = selected.permalink;
+				pPrice = selected.price;
 			}
 
-			const formasPago = tieneCobertura ? 3 : 2;
-			const opcionesMsg = `Tenemos ${formasPago} formas de pago:\n1️⃣ Medios de pago autorizados\n2️⃣ Paga directamente en nuestra página web${opcionPuntoFisico}\n¿Cuál prefieres?`;
+			const precioStr = pPrice ? ` por $${Number(pPrice).toLocaleString('es-CO')}` : '';
+			const opcionesMsg = `¡Excelente elección! El *${productoSolicitado || 'producto'}* tiene un valor de*${precioStr}* con envío gratis a ${context?.ciudad?.charAt(0).toUpperCase() + context?.ciudad?.slice(1)}.\n\nPara continuar con tu compra, ¿cómo prefieres realizar el pago? 💳\n1️⃣ Medios de pago autorizados (Transferencia bancaria / Corresponsal)\n2️⃣ Pagar directamente en nuestra página web (PSE, Tarjeta, Nequi)${opcionPuntoFisico}\n\nEscríbeme el número de tu opción y te doy las instrucciones. 😊`;
 
 			return {
 				response: opcionesMsg,
@@ -1535,6 +1542,21 @@ export class VentasAgent implements IAgent {
 			};
 		}
 
+		// ── PASO 4d: Confirmación de pago realizado (Mejora #7 de info.md) ──
+		const yaPago = /\b(?:ya pagu[eé]|pago realizado|ya transfer[ií]|ya realic[eé] el pago|ya hice el pago|pago hecho|listo el pago|comprobante enviado)\b/i.test(message);
+		if (yaPago && context?.modalidad === 'contado') {
+			return {
+				response: `¡Perfecto! Para confirmar tu pago, ¿me puedes compartir el comprobante o el número de transacción? (Puedes enviar una captura de pantalla / pantallazo o foto). 😊\n\nUna vez enviado, nuestro equipo verificará el pago en un tiempo máximo de 1 hora y procederemos con el despacho inmediato de tu pedido con envío gratis.`,
+				metadata: {
+					agentType: 'ventas',
+					flujo: 'esperando_comprobante',
+					ciudad: context?.ciudad,
+					ciudadValidada: true,
+					tieneCobertura: context?.tieneCobertura,
+				},
+			};
+		}
+
 		// ── PASO 5: Flujo de selección de pago ──────────────────────────────
 		if (context?.flujo === 'seleccion_pago') {
 			const opcion = message.trim();
@@ -1544,7 +1566,7 @@ export class VentasAgent implements IAgent {
 
 			if (/1|medios de pago|medios autorizados/i.test(opcion)) {
 				return {
-					response: `Estos son nuestros medios de pago autorizados:\nhttps://jlc-electronics.com/wp-content/uploads/2026/05/Medios_de_pago.jpeg\n\n¿Con cuál deseas pagar?`,
+					response: `Estos son nuestros medios de pago autorizados:\nhttps://jlc-electronics.com/wp-content/uploads/2026/05/Medios_de_pago.jpeg\n\nAhí verás las cuentas disponibles (Bancolombia, Davivienda, etc.). Una vez realices la transferencia, por favor compárteme tu nombre completo, número de cédula y el comprobante de pago para programar tu envío gratis de inmediato. 😊`,
 					metadata: {
 						agentType: 'ventas',
 						flujo: 'pago_medios',
@@ -1845,7 +1867,9 @@ REGLAS:
 - NUNCA compartas direcciones de agencias físicas.
 - NUNCA contradigas la condición de envío ya comunicada al cliente.
 - Máximo 3 líneas de texto, sin asteriscos ni formato.
-- Si el cliente ya dio datos (nombre, cédula, ciudad, presupuesto), úsalos sin pedirlos de nuevo.`,
+- Si el cliente ya dio datos (nombre, cédula, ciudad, presupuesto), úsalos sin pedirlos de nuevo.
+- PROHIBIDO confirmar o prometer el despacho o envío del pedido (ej: "se envía hoy mismo", "va directo", "tu pedido está listo para salir") si el cliente no ha pagado. Siempre indica que el envío se programará "tan pronto se confirme el pago".
+- Si el cliente dice que ya pagó, dile que para confirmar el pago te comparta el comprobante o número de transacción por este medio.`,
 			ejemplos: [
 				{
 					cliente: 'Busco una nevera',
@@ -1878,6 +1902,8 @@ REGLAS:
 				productosEncontrados: hayProductos,
 				ciudadValidada: context?.ciudadValidada,
 				ciudad: context?.ciudad,
+				modalidad: context?.modalidad,
+				tieneCobertura: context?.tieneCobertura,
 				productoSolicitado: productoBuscado,
 				ultimaBusqueda: products.length > 0
 					? { results: products.slice(0, 6), productoIndex }

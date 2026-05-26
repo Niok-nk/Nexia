@@ -75,32 +75,37 @@ export async function extractAndSaveData(
 			.join('\n');
 
 		// ── 1. Extraer datos del historial con IA ──────────────────────────
-		const prompt = `Eres un extractor de datos de clientes. Lees la conversación y extraes información del cliente.
+		const prompt = `Eres un extractor y corrector de datos de clientes de JLC Electronics.
+Tu tarea es leer minuciosamente el HISTORIAL de la conversación mensaje por mensaje, analizar el contexto y:
+1. Extraer nuevos datos del cliente que haya mencionado explícitamente.
+2. Detectar y CORREGIR cualquier incongruencia, error o contradicción entre los DATOS ACTUALES de la base de datos y lo dicho más recientemente por el cliente en el HISTORIAL (ejemplo: si el cliente corrigió la ortografía de su nombre, cambió de ciudad de destino, cambió su número de cédula, modificó su presupuesto o se decidió por un producto/referencia distinta).
 
-DATOS ACTUALES:
+Tu prioridad absoluta es garantizar que los datos guardados sean congruentes, veraces y reflejen la última decisión o aclaración del cliente.
+
+DATOS ACTUALES EN BASE DE DATOS:
 ${userDataStr || '(ninguno)'}
 
-HISTORIAL:
+HISTORIAL DE CONVERSACIÓN:
 ${historial}
 
 --- INSTRUCCIONES ---
-Extrae ÚNICAMENTE datos NUEVOS que el cliente haya mencionado explícitamente y que NO estén ya en la base de datos.
+Extrae datos nuevos o actualizados/corregidos que el cliente haya mencionado.
 
-Campos a extraer (solo si están EXPLÍCITAMENTE en la conversación):
-- nombre: nombre completo del cliente
-- cedula: número de cédula (solo dígitos)
-- direccion: dirección que mencionó
-- telefono: teléfono que mencionó
-- presupuesto: presupuesto o cantidad que dijo estar dispuesto a pagar
-- productoSolicitado: producto que busca (nevera, televisor, lavadora, repuesto, etc.)
-- ciudad: ciudad donde está
-- departamento: departamento donde está
+Campos a procesar (solo si están en el historial):
+- nombre: nombre completo del cliente (corregir si hay cambios o errores de ortografía)
+- cedula: número de cédula, solo dígitos (corregir si se digitó mal antes)
+- direccion: dirección de despacho (corregir si el cliente la cambia)
+- telefono: teléfono de contacto (corregir si especifica uno diferente)
+- presupuesto: presupuesto aproximado en pesos (corregir si cambia de opinión)
+- productoSolicitado: producto o referencia exacta que busca comprar (si cambia de opción de producto, actualízalo para reflejar el producto final de su elección)
+- ciudad: ciudad donde está o desea el envío (corregir si se cambia de destino)
+- departamento: departamento donde está o desea el envío (corregir si cambia)
 
-Responde SOLO con JSON válido, sin markdown ni explicaciones:
+Responde SOLO con JSON válido, sin markdown, sin bloques de código, sin explicaciones ni texto extra:
 {"datos":{}}
 
-Ejemplo: {"datos":{"nombre":"Carlos","ciudad":"Medellín"}}
-Si no hay datos nuevos: {"datos":{}}`;
+Ejemplo si hay datos nuevos o corregidos: {"datos":{"nombre":"Carlos Arturo","ciudad":"Medellín"}}
+Si todos los datos actuales son correctos y no hay nada nuevo ni incongruente que corregir: {"datos":{}}`;
 
 		const raw = await generateResponse(prompt);
 
