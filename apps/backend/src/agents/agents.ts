@@ -1497,8 +1497,11 @@ export class VentasAgent implements IAgent {
 				pPrice = selected.price;
 			}
 
-			const precioStr = pPrice ? ` por $${Number(pPrice).toLocaleString('es-CO')}` : '';
-			const opcionesMsg = `¡Excelente elección! El *${productoSolicitado || 'producto'}* tiene un valor de*${precioStr}* con envío gratis a ${context?.ciudad?.charAt(0).toUpperCase() + context?.ciudad?.slice(1)}.\n\nPara continuar con tu compra, ¿cómo prefieres realizar el pago? 💳\n1️⃣ Medios de pago autorizados (Transferencia bancaria / Corresponsal)\n2️⃣ Pagar directamente en nuestra página web (PSE, Tarjeta, Nequi)${opcionPuntoFisico}\n\nEscríbeme el número de tu opción y te doy las instrucciones. 😊`;
+			const precioStr = pPrice ? ` tiene un valor de *$${Number(pPrice).toLocaleString('es-CO')}*` : '';
+			const linkStr = productoURL ? `\nAquí tienes el enlace del producto:\n${productoURL}` : '';
+			const ciudadStr = context?.ciudad ? ` con envío gratis a ${context.ciudad.charAt(0).toUpperCase() + context.ciudad.slice(1)}` : '';
+			
+			const opcionesMsg = `¡Excelente elección! El *${productoSolicitado || 'producto'}*${precioStr}${ciudadStr}.${linkStr}\n\nPara continuar con tu compra, ¿cómo prefieres realizar el pago? 💳\n1️⃣ Por transferencia bancaria (medios autorizados)\n2️⃣ Directamente en nuestra página web (PSE, Tarjeta, Nequi)${opcionPuntoFisico}\n\nEscríbeme el número de tu opción y te doy las instrucciones paso a paso. 😊`;
 
 			return {
 				response: opcionesMsg,
@@ -1589,7 +1592,7 @@ export class VentasAgent implements IAgent {
 		const yaPago = /\b(?:ya pagu[eé]|pago realizado|ya transfer[ií]|ya realic[eé] el pago|ya hice el pago|pago hecho|listo el pago|comprobante enviado)\b/i.test(message);
 		if (yaPago && context?.modalidad === 'contado') {
 			return {
-				response: `¡Perfecto! Para confirmar tu pago, ¿me puedes compartir el comprobante o el número de transacción? (Puedes enviar una captura de pantalla / pantallazo o foto). 😊\n\nUna vez enviado, nuestro equipo verificará el pago en un tiempo máximo de 1 hora y procederemos con el despacho inmediato de tu pedido con envío gratis.`,
+				response: `¡Perfecto! Para confirmar tu pago, ¿me puedes compartir el comprobante o el número de transacción? (Puedes enviar una captura de pantalla / pantallazo o foto). 😊\n\nUna vez enviado, nuestro equipo verificará el pago en un tiempo máximo de 1 hora y procederemos con el despacho inmediato de tu pedido con envío gratis. En ese momento te enviaremos el número de guía para que puedas rastrearlo.`,
 				metadata: {
 					agentType: 'ventas',
 					flujo: 'esperando_comprobante',
@@ -1607,9 +1610,9 @@ export class VentasAgent implements IAgent {
 			const ultimosProductos = context?.ultimaBusqueda?.results ?? [];
 			const productoURL = context?.productoURL ?? ultimosProductos[0]?.permalink;
 
-			if (/1|medios de pago|medios autorizados/i.test(opcion)) {
+			if (/1|transferencia|medios de pago|medios autorizados/i.test(opcion)) {
 				return {
-					response: `Estos son nuestros medios de pago autorizados:\nhttps://jlc-electronics.com/wp-content/uploads/2026/05/Medios_de_pago.jpeg\n\nAhí verás las cuentas disponibles (Bancolombia, Davivienda, etc.). Una vez realices la transferencia, por favor compárteme tu nombre completo, número de cédula y el comprobante de pago para programar tu envío gratis de inmediato. 😊`,
+					response: `Estos son nuestros medios de pago autorizados:\nhttps://jlc-electronics.com/wp-content/uploads/2026/05/Medios_de_pago.jpeg\n\nAhí verás todas las cuentas disponibles (Bancolombia, Davivienda, Nequi, etc.). Una vez realices la transferencia, por favor compárteme tu nombre completo, número de cédula y el comprobante de pago para programar tu envío gratis de inmediato.\n\n¿Pudiste completar el pago o te surgió alguna duda? 😊`,
 					metadata: {
 						agentType: 'ventas',
 						flujo: 'pago_medios',
