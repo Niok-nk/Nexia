@@ -1748,8 +1748,9 @@ export class VentasAgent implements IAgent {
 				};
 			}
 		}
-		if (categoriaGeneral && context?.flujo !== 'perfilando') {
-			const cat = detectarCategoria(message);
+		const catDetectada = detectarCategoria(message);
+		if ((categoriaGeneral || catDetectada) && context?.flujo !== 'perfilando') {
+			const cat = catDetectada;
 			if (cat) {
 				// Detectar si el usuario ya dio información espontánea (shortcuts)
 				const shortcuts = detectarShortcuts(message, cat);
@@ -1837,7 +1838,14 @@ export class VentasAgent implements IAgent {
 				products = busquedaGuardada.results;
 				productoIndex = (busquedaGuardada.productoIndex ?? 0) + 1;
 				if (productoIndex >= products.length) {
-					productoIndex = products.length;
+					// Se agotaron los productos guardados → re-consultar WooCommerce
+					const terminoReSearch = busquedaGuardada.categoria || context?.terminoBusqueda || '';
+					if (terminoReSearch) {
+						products = [];
+						terminoBusqueda = terminoReSearch;
+					} else {
+						productoIndex = products.length;
+					}
 				}
 			} else {
 				// No hay búsqueda guardada → pedir que especifique

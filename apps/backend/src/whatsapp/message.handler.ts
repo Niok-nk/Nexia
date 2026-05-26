@@ -273,6 +273,8 @@ export async function processIncomingMessage(
 	if (extra?.perfilState) context.perfilState = extra.perfilState;
 	if (typeof extra?.tieneCobertura === 'boolean') context.tieneCobertura = extra.tieneCobertura;
 	if (extra?.modalidad) context.modalidad = extra.modalidad;
+	if (extra?.creditoData) context.creditoData = extra.creditoData;
+	if (typeof extra?.creditoStep === 'number') context.creditoStep = extra.creditoStep;
 
 	// 6. Enrutar al orquestador
 	const { agentType, response, metadata } = await orchestrator.route(body, context);
