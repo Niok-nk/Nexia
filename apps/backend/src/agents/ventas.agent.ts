@@ -105,48 +105,40 @@ export async function enviarResumenWhatsApp(resumen: string): Promise<void> {
 }
 
 /**
- * Intenta hacer match de un mensaje de usuario con un producto de la lista.
- * Soporta: ordinales masc/fem, índice numérico corto, specs numéricas en el nombre, nombre parcial.
+ * Usa Inteligencia Artificial para entender exactamente qué producto eligió el cliente
+ * sin importar si usa ordinales, marcas, especificaciones incompletas o sinónimos.
  */
-function matchProductoDesdeMsg(msg: string, productos: any[]): any | null {
+async function matchProductoDesdeMsg(msg: string, productos: any[]): Promise<any | null> {
 	if (!productos || productos.length === 0) return null;
 	const lowerMsg = msg.toLowerCase().trim();
 
-	// 1. Número de specs presente en el mensaje que aparece en el nombre del producto
-	//    Ej: "900" matchea "Licuadora 900W". Es la señal más fuerte si el usuario es específico.
-	const numbersInMsg = lowerMsg.match(/\b\d{2,}\b/g);
-	if (numbersInMsg && numbersInMsg.length > 0) {
-		const candidates = productos.filter((p: any) =>
-			numbersInMsg.some((num: string) => p.name.toLowerCase().includes(num))
-		);
-		if (candidates.length >= 1) return candidates[0];
-	}
-
-	// 2. Nombre parcial: el mensaje incluye parte del nombre del producto o viceversa
-	const byName = productos.find((p: any) => {
-		const nameLower = p.name.toLowerCase();
-		return nameLower.includes(lowerMsg) || lowerMsg.includes(nameLower.slice(0, 20));
-	});
-	if (byName) return byName;
-
-	// 3. Ordinal explícito (masculino y femenino)
-	const ORDINALS: Array<[RegExp, number]> = [
-		[/\b(?:primer[oa]|primera\s+opci[oó]n|el\s+primero|la\s+primera|uno|1[aº]?)\b/, 0],
-		[/\b(?:segund[oa]|segunda\s+opci[oó]n|el\s+segundo|la\s+segunda|dos|2[aº]?)\b/, 1],
-		[/\b(?:tercer[oa]|tercera\s+opci[oó]n|el\s+tercero|la\s+tercera|tres|3[aº]?)\b/, 2],
-		[/\b(?:cuart[oa]|cuarta\s+opci[oó]n|el\s+cuarto|la\s+cuarta|cuatro|4[aº]?)\b/, 3],
-		[/\b(?:quint[oa]|quinta\s+opci[oó]n|el\s+quinto|la\s+quinta|cinco|5[aº]?)\b/, 4],
-	];
-	for (const [re, idx] of ORDINALS) {
-		if (re.test(lowerMsg) && idx < productos.length) {
-			return productos[idx];
-		}
-	}
-
-	// 4. Índice numérico corto ("1", "2", "3" — máx 2 caracteres para no confundir con specs)
+	// 1. Camino rápido: si escribe exactamente "1", "2", etc.
 	const shortNum = parseInt(lowerMsg, 10);
 	if (!isNaN(shortNum) && lowerMsg.length <= 2 && shortNum >= 1 && shortNum <= productos.length) {
 		return productos[shortNum - 1];
+	}
+
+	// 2. IA para interpretar natural language robustamente
+	const listaStr = productos.map((p, i) => `${i + 1}. ${p.name}`).join('\n');
+	const system = `Eres un sistema experto de análisis de intenciones comerciales.
+Lista de productos en pantalla:
+${listaStr}
+
+REGLAS:
+- El cliente responderá indicando cuál producto quiere. Puede usar ordinales ("la primera"), marcas, especificaciones técnicas ("la de 900w") o colores.
+- Determina qué producto de la lista seleccionó.
+- RESPONDE ÚNICAMENTE CON EL NÚMERO DE ÍNDICE DEL PRODUCTO (1, 2, 3...).
+- Si la respuesta es ambigua, pregunta por otra cosa o no selecciona ningún producto, responde "0".
+- NO des explicaciones, solo el número.`;
+
+	try {
+		const raw = await generateResponse(msg, system);
+		const num = parseInt(raw.trim(), 10);
+		if (!isNaN(num) && num >= 1 && num <= productos.length) {
+			return productos[num - 1];
+		}
+	} catch (e) {
+		console.error("[Ventas] Error en matchProductoDesdeMsg con IA:", e);
 	}
 
 	return null;
@@ -400,8 +392,8 @@ export class VentasAgent implements IAgent {
 			const opcion = message.trim();
 			const ultimosProductos = context?.ultimaBusqueda?.results ?? [];
 			
-			// Usar helper centralizado de matching (soporta ordinales masc/fem, specs, nombre parcial)
-			const selected: any = matchProductoDesdeMsg(opcion, ultimosProductos);
+			// Usar IA para interpretar cuál producto seleccionó
+			const selected: any = await matchProductoDesdeMsg(opcion, ultimosProductos);
 
 			if (selected) {
 				const precioStr = selected.price ? ` tiene un valor de *$${Number(selected.price).toLocaleString('es-CO')}*` : '';
@@ -645,8 +637,8 @@ export class VentasAgent implements IAgent {
 				productoURL = ultimosProductos[0].permalink;
 				pPrice = ultimosProductos[0].price;
 			} else if (ultimosProductos.length > 1) {
-				// Usar helper centralizado (ordinales masc/fem, specs, nombre parcial)
-				const matchResult = matchProductoDesdeMsg(message, ultimosProductos);
+				// Usar IA para interpretar cuál producto seleccionó
+				const matchResult = await matchProductoDesdeMsg(message, ultimosProductos);
 				
 				if (!matchResult) {
 					// No se pudo identificar → preguntar con lista numerada
