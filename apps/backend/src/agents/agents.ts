@@ -158,7 +158,7 @@ function obtenerTerminoBusquedaDesdePerfil(categoria: string, answers: Record<st
 		if (answers.presupuesto === 'alto') return 'nevecon';
 		return 'nevera';
 	}
-	if (categoria === 'cocina') return 'electrodomesticos cocina';
+	if (categoria === 'cocina') return 'cocina';
 	if (categoria === 'audio') return 'parlante';
 	return categoria;
 }
@@ -1776,7 +1776,7 @@ export class VentasAgent implements IAgent {
 
 				// Si ya completó todos los campos espontáneamente, omitir perfilamiento
 				if (campos >= pasos.length) {
-					const terminoBusqueda = obtenerTerminoBusquedaDesdePerfil(cat, shortcuts);
+					const terminoBusqueda = terminoParaBuscar;
 					context = { ...context, terminoBusqueda };
 				} else {
 					// Iniciar perfilamiento: encontrar el primer campo sin responder
@@ -1788,7 +1788,7 @@ export class VentasAgent implements IAgent {
 							metadata: {
 								agentType: 'ventas',
 								flujo: 'perfilando',
-								perfilState: { categoria: cat, step: pasos.indexOf(primerPaso) + 1, answers: shortcuts, terminoOriginal: prodMatch ? prodMatch[1].trim().toLowerCase() : null },
+								perfilState: { categoria: cat, step: pasos.indexOf(primerPaso) + 1, answers: shortcuts, terminoOriginal: prodMatch ? prodMatch[1].trim().toLowerCase() : terminoParaBuscar },
 								ciudad: context?.ciudad,
 								ciudadValidada: true,
 								tieneCobertura: context?.tieneCobertura,

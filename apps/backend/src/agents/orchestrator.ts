@@ -294,7 +294,9 @@ Categoría:`;
 		let metadata = result.metadata || {};
 
 		// Si fue interrumpido, ofrecer retomar el flujo anterior y guardarlo como pausado
-		if (fueInterrumpido && flujoOriginal) {
+		// Solo si el agente NO inició un flujo nuevo (no pisa metadata.flujo)
+		const agenteYaCambioFlujo = metadata?.flujo && metadata.flujo !== flujoOriginal;
+		if (fueInterrumpido && flujoOriginal && !agenteYaCambioFlujo) {
 			if (/^credito/.test(flujoOriginal)) {
 				response += `\n\n¿Quieres que sigamos con tu solicitud de crédito? Cuéntame o escribe "sí" para continuar. 😊`;
 				metadata = {
