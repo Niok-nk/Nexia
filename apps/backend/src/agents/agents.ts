@@ -106,89 +106,11 @@ const PROFILING_STEPS: Record<string, ProfilingStep[]> = {
 
 function resolverRespuestaPerfil(msg: string, field: string): string {
 	const lower = msg.toLowerCase().trim();
-	const num = lower.replace(/[^0-9]/g, '');
 
-	if (field === 'tipo') {
-		if (num === '1' || /auto/i.test(lower)) return 'automatica';
-		if (num === '2' || /semi/i.test(lower)) return 'semiautomatica';
-		if (num === '3' || /no s[eé]/i.test(lower) || /seguro/i.test(lower)) return 'no_sabe';
-		return 'no_sabe';
-	}
-	if (field === 'personas') {
-		if (num === '1' || /1|2|uno|dos/i.test(lower)) return '1-2';
-		if (num === '2' || /3|4|tres|cuatro/i.test(lower)) return '3-4';
-		if (num === '3' || /5|mas|más|cinco|muchos|familia|grande/i.test(lower)) return '5+';
-		// Intentar extraer número directo
-		const numPersonas = parseInt(lower.match(/\d+/)?.[0] || '');
-		if (numPersonas <= 2) return '1-2';
-		if (numPersonas <= 4) return '3-4';
-		if (numPersonas >= 5) return '5+';
-		return '3-4';
-	}
-	if (field === 'espacio') {
-		if (num === '1' || /sala|comedor|principal/i.test(lower)) return 'sala';
-		if (num === '2' || /habitaci[oó]n|cuarto|alcoba|dormitorio/i.test(lower)) return 'habitacion';
-		if (num === '3' || /cocina|negocio|oficina|local/i.test(lower)) return 'negocio';
-		if (/amplio|grande|espacioso/i.test(lower)) return 'amplio';
-		if (/reducido|pequeñ[oa]|chico|angosto/i.test(lower)) return 'reducido';
-		return 'sala';
-	}
-	if (field === 'tamano') {
-		if (num === '1' || /pequeñ[oa]|32|40|43|chico/i.test(lower)) return '32-43';
-		if (num === '2' || /mediano|mediana|50|55/i.test(lower)) return '50-55';
-		if (num === '3' || /grande|65|75|70|enorme|gigante/i.test(lower)) return '65+';
-		if (num === '4' || /no s[eé]/i.test(lower) || /seguro/i.test(lower)) return 'no_sabe';
-		// Detectar m² para aire acondicionado
-		if (/menos de 15|peque/i.test(lower)) return 'reducido';
-		if (/m[aá]s de 25|grande|amplio/i.test(lower)) return 'grande';
-		if (/15|20|25/i.test(lower)) return '15-25';
-		return 'no_sabe';
-	}
-	if (field === 'smart') {
-		if (num === '1' || /s[íi]|smart|aplicaciones|indispensable/i.test(lower)) return 'si';
-		if (num === '2' || /no|igual|da lo mismo/i.test(lower)) return 'no_importa';
-		return 'no_importa';
-	}
-	if (field === 'inverter') {
-		if (num === '1' || /inverter|ahorr/i.test(lower)) return 'inverter';
-		if (num === '2' || /convencional|normal|barat/i.test(lower)) return 'convencional';
-		if (num === '3' || /no s[eé]/i.test(lower) || /seguro/i.test(lower)) return 'no_sabe';
-		return 'no_sabe';
-	}
-	if (field === 'tipo_ventilador') {
-		if (num === '1' || /pedestal|parado/i.test(lower)) return 'pedestal';
-		if (num === '2' || /torre/i.test(lower)) return 'torre';
-		if (num === '3' || /techo/i.test(lower)) return 'techo';
-		if (num === '4' || /port[aá]til|mesa|escritorio/i.test(lower)) return 'portatil';
-		return 'pedestal';
-	}
-	if (field === 'uso_negocio') {
-		if (num === '1' || /hogar|casa|personal|familia/i.test(lower)) return 'hogar';
-		if (num === '2' || /negocio|tienda|comercial|local/i.test(lower)) return 'negocio';
-		return 'hogar';
-	}
-	if (field === 'uso') {
-		// Para categoría "otra": respuesta libre
-		return msg;
-	}
-	if (field === 'uso_audio') {
-		if (num === '1' || /fiesta|evento|discoteca|fiesta/i.test(lower)) return 'fiestas';
-		if (num === '2' || /ambiental|música de fondo|suave|música ambiental/i.test(lower)) return 'ambiental';
-		if (num === '3' || /karaoke|cantar|micrófono|microfono|dj/i.test(lower)) return 'karaoke';
-		if (num === '4' || /port[aá]til|bluetooth|personal|llevar|movil/i.test(lower)) return 'portatil';
-		return 'fiestas';
-	}
-	if (field === 'uso_minibar') {
-		if (num === '1' || /oficina|trabajo|escritorio/i.test(lower)) return 'oficina';
-		if (num === '2' || /habitaci[oó]n|cuarto|alcoba|dormitorio/i.test(lower)) return 'habitacion';
-		if (num === '3' || /sala|bar|sala estar|sala de estar|familia/i.test(lower)) return 'sala';
-		return 'oficina';
-	}
 	if (field === 'presupuesto') {
-		if (num === '1' || /menos|bajo|barato|econ[oó]mico/i.test(lower)) return 'bajo';
-		if (num === '2' || /medio|moderado|normal|800|900|mill[oó]n|entre/i.test(lower)) return 'medio';
-		if (num === '3' || /nevecon|alto|2\.5|3|4|5\s*mill/i.test(lower)) return 'alto';
-		if (num === '4' || /sin l[ií]mite|lo que sea|no importa|indistinto|necesario|ilimitado/i.test(lower)) return 'alto';
+		if (/menos|bajo|barato|econ[oó]mico/i.test(lower)) return 'bajo';
+		if (/medio|moderado|normal/i.test(lower)) return 'medio';
+		if (/nevecon|alto|sin l[ií]mite|lo que sea|no importa|ilimitado/i.test(lower)) return 'alto';
 		const numVal = lower.match(/([\d.]+)/);
 		if (numVal) {
 			const valor = parseFloat(numVal[1].replace(/\./g, ''));
@@ -211,7 +133,6 @@ function detectarCategoria(msg: string): string | null {
 	if (/vitrina|vitrinas/i.test(lower)) return 'vitrina';
 	if (/exhibidor|exhibidores/i.test(lower)) return 'exhibidor';
 	if (/minibar|mini\s*bar/i.test(lower)) return 'minibar';
-	if (/ventilador|ventiladores|aire acondicionado port[aá]til|clima/i.test(lower)) return 'ventilador';
 	if (/cabina|cabinas|parlante|parlantes|torre de sonido|torres de sonido|sonido|audio|bafle|bocina/i.test(lower)) return 'audio';
 	if (/cafetera|cafeteras|freidora|freidoras|hervidor|hervidores|horno|hornos|licuadora|licuadoras|olla|ollas|arrocera|exprimidor/i.test(lower)) return 'cocina';
 	if (CATEGORIAS_RE.test(msg)) return 'otra';
@@ -222,111 +143,24 @@ function detectarShortcuts(message: string, categoria: string): Record<string, s
 	const lower = message.toLowerCase();
 	const answers: Record<string, string> = {};
 
-	if (categoria === 'lavadora') {
-		if (/autom[aá]tic[oa]/i.test(lower)) answers.tipo = 'automatica';
-		if (/semi/i.test(lower)) answers.tipo = 'semiautomatica';
-		const kgMatch = lower.match(/(\d+)\s*(?:kg|kilos|k|lb|libras)/i);
-		if (kgMatch) {
-			const kg = parseInt(kgMatch[1]);
-			if (kg <= 9) answers.personas = '1-2';
-			else if (kg <= 13) answers.personas = '3-4';
-			else answers.personas = '5+';
-		}
-	} else if (categoria === 'televisor') {
-		if (/sala/i.test(lower)) answers.espacio = 'sala';
-		if (/habitaci[oó]n|cuarto|alcoba/i.test(lower)) answers.espacio = 'habitacion';
-		if (/cocina|negocio|oficina/i.test(lower)) answers.espacio = 'negocio';
-		const inchMatch = lower.match(/(\d+)\s*(?:pulgadas|pulg|\")/i);
-		if (inchMatch) {
-			const inch = parseInt(inchMatch[1]);
-			if (inch <= 43) answers.tamano = '32-43';
-			else if (inch <= 55) answers.tamano = '50-55';
-			else answers.tamano = '65+';
-		}
-		if (/grande/i.test(lower)) answers.tamano = '65+';
-		if (/pequeñ[oa]/i.test(lower)) answers.tamano = '32-43';
-		if (/mediano/i.test(lower)) answers.tamano = '50-55';
-	} else if (categoria === 'nevera') {
+	if (categoria === 'nevera') {
 		if (/nevecon|nevecones|doble puerta|side by side|french door/i.test(lower)) {
-			answers.presupuesto = 'alto'; // Nevecones siempre son gama alta
+			answers.presupuesto = 'alto';
 		}
-		if (/barato|econ[oó]mico|barata/i.test(lower)) answers.presupuesto = 'bajo';
-		if (/grande|familiar|ampli[oa]/i.test(lower)) answers.presupuesto = 'medio';
-	} else if (categoria === 'audio') {
-		if (/fiesta|evento|fiesta|discoteca/i.test(lower)) answers.uso_audio = 'fiestas';
-		if (/ambiental|música de fondo|suave|hogar|casa/i.test(lower)) answers.uso_audio = 'ambiental';
-		if (/karaoke|cantar|micrófono|dj/i.test(lower)) answers.uso_audio = 'karaoke';
-		if (/port[aá]til|bluetooth|personal|llevar/i.test(lower)) answers.uso_audio = 'portatil';
-	} else if (categoria === 'cocina') {
-		if (/1|2|uno|dos|peque/i.test(lower)) answers.personas = '1-2';
-		if (/3|4|tres|cuatro|mediano/i.test(lower)) answers.personas = '3-4';
-		if (/5|mas|más|grande|familia/i.test(lower)) answers.personas = '5+';
-	} else if (categoria === 'congelador' || categoria === 'vitrina' || categoria === 'exhibidor') {
-		if (/hogar|casa|personal|familia/i.test(lower)) answers.uso_negocio = 'hogar';
-		if (/negocio|tienda|comercial|local|venta|almac[eé]n/i.test(lower)) answers.uso_negocio = 'negocio';
-		if (/pequeñ[oa]|chico|mini/i.test(lower)) answers.tamano = 'pequeno';
-		if (/grande|amplio/i.test(lower)) answers.tamano = 'grande';
-	} else if (categoria === 'minibar') {
-		if (/oficina|trabajo/i.test(lower)) answers.uso_minibar = 'oficina';
-		if (/habitaci[oó]n|cuarto|alcoba/i.test(lower)) answers.uso_minibar = 'habitacion';
-		if (/sala|bar|compartir/i.test(lower)) answers.uso_minibar = 'sala';
 	}
-	// Presupuesto espontáneo genérico
 	if (/barato|econ[oó]mico|menos/i.test(lower)) answers.presupuesto = 'bajo';
 	if (/lo que sea|sin l[ií]mite|no importa|indistinto|el mejor|necesario/i.test(lower)) answers.presupuesto = 'alto';
 	return answers;
 }
 
 function obtenerTerminoBusquedaDesdePerfil(categoria: string, answers: Record<string, string>): string {
-	if (categoria === 'lavadora') {
-		const tipo = answers.tipo || 'automatica';
-		if (tipo === 'semiautomatica') {
-			return 'lavadora semiautomatica';
-		}
-		return 'lavadora automatica';
-	}
-	if (categoria === 'televisor') {
-		return 'televisor';
-	}
 	if (categoria === 'nevera') {
-		const presupuesto = answers.presupuesto || 'medio';
-		if (presupuesto === 'alto') return 'nevecon';
+		if (answers.presupuesto === 'alto') return 'nevecon';
 		return 'nevera';
 	}
-	if (categoria === 'audio') {
-		const uso = answers.uso_audio || '';
-		if (/fiesta|fiesta|karaoke/i.test(uso)) return 'cabina de sonido';
-		if (/portatil/i.test(uso)) return 'parlante portatil';
-		if (/ambiental/i.test(uso)) return 'parlante';
-		return 'parlante';
-	}
-	if (categoria === 'cocina') {
-		return 'electrodomesticos cocina';
-	}
-	if (categoria === 'ventilador') {
-		return 'ventilador';
-	}
-	if (categoria === 'congelador') {
-		const tamano = answers.tamano || 'mediano';
-		if (tamano === 'pequeno') return 'congelador 300';
-		if (tamano === 'grande') return 'congelador 700';
-		return 'congelador';
-	}
-	if (categoria === 'vitrina') {
-		const tamano = answers.tamano || 'mediano';
-		if (tamano === 'pequeno') return 'vitrina 200';
-		if (tamano === 'grande') return 'vitrina 1000';
-		return 'vitrina';
-	}
-	if (categoria === 'exhibidor') {
-		const tamano = answers.tamano || 'grande';
-		if (tamano === 'pequeno') return 'exhibidor 200';
-		return 'exhibidor';
-	}
-	if (categoria === 'minibar') {
-		return 'minibar';
-	}
-	return answers.uso || '';
+	if (categoria === 'cocina') return 'electrodomesticos cocina';
+	if (categoria === 'audio') return 'parlante';
+	return categoria;
 }
 
 function camposPerfilCompletados(answers: Record<string, string>): number {
