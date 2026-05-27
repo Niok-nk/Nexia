@@ -235,6 +235,15 @@ Categoría:`;
 			if (context) context.flujo = null;
 		}
 
+		// ─── INTERRUPCIÓN DE FLUJO GUIADO ───
+		// Detectar si el usuario hace una pregunta o cambia de tema mientras está en un flujo paso a paso
+		let fueInterrumpido = false;
+		let flujoOriginal = flujoActivo;
+		if (flujoActivo && esInterrupcionFlujo(message, flujoActivo)) {
+			flujoActivo = null; // Ignorar el flujo por este turno para poder responder la duda del cliente
+			fueInterrumpido = true;
+		}
+
 		// Si hay un flujo activo en el contexto, respetar el agente actual
 		// para no interrumpir procesos en curso (crédito, repuestos, etc.)
 		let intent: IntentKey;
@@ -256,12 +265,71 @@ Categoría:`;
 		const agent = this.agents[intent] || this.agents.ventas;
 		const result = await agent.handle(message, context);
 
+		let response = result.response;
+		let metadata = result.metadata || {};
+
+		// Si fue interrumpido, ofrecer retomar el flujo anterior y guardarlo como pausado
+		if (fueInterrumpido && flujoOriginal) {
+			if (/^credito/.test(flujoOriginal)) {
+				response += `\n\n¿Quieres que sigamos con tu solicitud de crédito? Cuéntame o escribe "sí" para continuar. 😊`;
+				metadata = {
+					...metadata,
+					flujo: 'credito_pausado',
+					creditoData: context?.creditoData || {},
+					creditoStep: context?.creditoStep || 1,
+				};
+			} else if (flujoOriginal === 'pago_web_paso' || flujoOriginal === 'pago_web' || flujoOriginal === 'seleccion_pago') {
+				response += `\n\n¿Quieres que continuemos con los pasos de tu pago? Cuéntame o escribe "sí" para seguir donde íbamos. 😊`;
+				metadata = {
+					...metadata,
+					flujo: 'pago_pausado',
+					flujoAnterior: flujoOriginal,
+					productoURL: context?.productoURL || context?.ultimaBusqueda?.results?.[0]?.permalink,
+				};
+			} else if (flujoOriginal === 'perfilando') {
+				response += `\n\n¿Quieres que sigamos buscando el producto ideal para ti? Cuéntame o escribe "sí" para continuar. 😊`;
+				metadata = {
+					...metadata,
+					flujo: 'perfilando_pausado',
+					perfilState: context?.perfilState,
+				};
+			}
+		}
+
 		return {
 			agentType: intent,
-			response: result.response,
-			metadata: result.metadata,
+			response,
+			metadata,
 		};
 	}
+}
+
+/**
+ * Detecta si el mensaje actual es una interrupción del flujo guiado (una pregunta o un cambio de tema)
+ */
+function esInterrupcionFlujo(message: string, flujo: string): boolean {
+	const msg = message.toLowerCase().trim();
+
+	// Exclusiones: respuestas a preguntas específicas del flujo de crédito o pago
+	// Si son números cortos, confirmaciones simples o palabras clave esperadas, NO es interrupción
+	if (/^\s*\d+\s*$/.test(msg)) return false; // opciones numéricas
+	if (/^(?:si|sí|no|ok|vale|listo|entendido|dale|bueno|por favor|gracias)\s*$/i.test(msg)) return false; // respuestas simples
+
+	// Si es una pregunta explícita (tiene signos de interrogación)
+	if (/[?¿]/.test(msg)) return true;
+
+	// Si empieza con palabras clave de pregunta
+	if (/^(?:c[oó]mo|qu[eé]|cu[aá]nto|d[oó]nde|por\s*qu[eé]|cu[aá]l|tiene|tienen|venden)\b/.test(msg)) return true;
+
+	// Palabras clave de interrupción general (características del producto, etc.)
+	if (/\b(?:garant[ií]a|precio|costo|valor|cuanto cuesta|especificaciones|medidas|dimensiones|envio|flete|cobertura|asesor|humano|soporte)\b/.test(msg)) return true;
+
+	// Si estamos en flujo de pago web y preguntan por medios autorizados o transferencias
+	if (flujo === 'pago_web_paso' || flujo === 'pago_web' || flujo === 'seleccion_pago') {
+		if (/\b(?:transferencia|medios autorizados|bancolombia|nequi|daviplata|efectivo|punto fisico|tienda|cuenta)\b/.test(msg)) return true;
+	}
+
+	return false;
 }
 
 export const orchestrator = new Orchestrator();

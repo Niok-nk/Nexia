@@ -184,7 +184,7 @@ export async function processIncomingMessage(
 	const history = await prisma.message.findMany({
 		where: { contactId: contact.id },
 		orderBy: { sentAt: 'desc' },
-		take: 10,
+		take: 30,
 	});
 
 	// Guardamos INBOUND para persistencia; el routing usa `history` (sin este mensaje)
@@ -273,6 +273,8 @@ export async function processIncomingMessage(
 	if (extra?.perfilState) context.perfilState = extra.perfilState;
 	if (typeof extra?.tieneCobertura === 'boolean') context.tieneCobertura = extra.tieneCobertura;
 	if (extra?.modalidad) context.modalidad = extra.modalidad;
+	if (extra?.flujoAnterior) context.flujoAnterior = extra.flujoAnterior;
+	if (extra?.creditoOptions) context.creditoOptions = extra.creditoOptions;
 	if (extra?.creditoData) context.creditoData = extra.creditoData;
 	if (typeof extra?.creditoStep === 'number') context.creditoStep = extra.creditoStep;
 

@@ -71,27 +71,26 @@ interface ProfilingStep {
 const PROFILING_STEPS: Record<string, ProfilingStep[]> = {
 	lavadora: [
 		{ field: 'tipo', pregunta: '¿La prefieres automática o semiautomática? 🧺\n\n🔵 Automática\n🟢 Semiautomática\n🤷 No estoy seguro' },
-		{ field: 'personas', pregunta: '¿Para cuántas personas es tu hogar? 👥\n\n1️⃣ 1 a 2\n2️⃣ 3 a 4\n3️⃣ 5 o más' },
-		{ field: 'presupuesto', pregunta: '¿Presupuesto aproximado? 💰\n\n1️⃣ Menos de $800.000\n2️⃣ $800.000 – $1.200.000\n3️⃣ Lo que sea necesario' },
+		{ field: 'presupuesto', pregunta: '¿Tienes en mente algún presupuesto aproximado para la lavadora, o prefieres ver todas las opciones disponibles? 💰' },
 	],
 	televisor: [
 		{ field: 'espacio', pregunta: '¿Para qué espacio es? 📺\n\n1️⃣ Sala\n2️⃣ Habitación\n3️⃣ Cocina o negocio' },
 		{ field: 'tamano', pregunta: '¿Qué tamaño buscas? 📏\n\n1️⃣ 32" a 43"\n2️⃣ 50" a 55"\n3️⃣ 65" o más\n4️⃣ No estoy seguro' },
 		{ field: 'smart', pregunta: '¿Necesitas Smart TV con apps? 🌐\n\n1️⃣ Sí\n2️⃣ No importa' },
-		{ field: 'presupuesto', pregunta: '¿Presupuesto aproximado? 💰\n\n1️⃣ Menos de $700.000\n2️⃣ $700.000 – $1.200.000\n3️⃣ Más de $1.200.000' },
+		{ field: 'presupuesto', pregunta: '¿Tienes en mente algún presupuesto aproximado para el televisor, o prefieres ver todas las opciones disponibles? 💰' },
 	],
 	nevera: [
-		{ field: 'presupuesto', pregunta: '¿Qué presupuesto tienes en mente? 💰\n\n1️⃣ Menos de $1.000.000\n2️⃣ $1.000.000 – $2.500.000\n3️⃣ $2.500.000 – $5.000.000 (nevecones)\n4️⃣ Sin límite' },
+		{ field: 'presupuesto', pregunta: '¿Tienes algún presupuesto en mente para la nevera, o prefieres ver todas las opciones disponibles? 💰' },
 	],
 	aire: [
 		{ field: 'espacio', pregunta: '¿Para qué espacio? ❄️\n\n1️⃣ Habitación\n2️⃣ Sala o comedor\n3️⃣ Oficina o local' },
 		{ field: 'tamano', pregunta: '¿Tamaño del espacio? 📏\n\n1️⃣ Menos de 15 m²\n2️⃣ 15 a 25 m²\n3️⃣ Más de 25 m²' },
 		{ field: 'inverter', pregunta: '¿Inverter o convencional? 🟢\n\n1️⃣ Inverter (ahorra hasta 60% energía)\n2️⃣ Convencional (más económico)\n3️⃣ No estoy seguro' },
-		{ field: 'presupuesto', pregunta: '¿Presupuesto aproximado? 💰\n\n1️⃣ Menos de $600.000\n2️⃣ $600.000 – $1.200.000\n3️⃣ Más de $1.200.000' },
+		{ field: 'presupuesto', pregunta: '¿Tienes algún presupuesto pensado para el aire acondicionado, o prefieres ver todas las opciones disponibles? 💰' },
 	],
 	audio: [
 		{ field: 'uso_audio', pregunta: '¿Para qué uso? 🎵\n\n1️⃣ Fiestas y eventos\n2️⃣ Sonido ambiental\n3️⃣ Karaoke o DJ\n4️⃣ Uso portátil' },
-		{ field: 'presupuesto', pregunta: '¿Presupuesto aproximado? 💰\n\n1️⃣ Menos de $300.000\n2️⃣ $300.000 – $800.000\n3️⃣ Más de $800.000' },
+		{ field: 'presupuesto', pregunta: '¿Tienes algún presupuesto aproximado para el parlante, o prefieres ver todas las opciones disponibles? 💰' },
 	],
 	cocina: [
 		{ field: 'personas', pregunta: '¿Para cuántas personas en tu hogar? 👨‍👩‍👧‍👧\n\n1️⃣ 1 a 2\n2️⃣ 3 a 4\n3️⃣ 5 o más' },
@@ -313,27 +312,17 @@ function detectarShortcuts(message: string, categoria: string): Record<string, s
 function obtenerTerminoBusquedaDesdePerfil(categoria: string, answers: Record<string, string>): string {
 	if (categoria === 'lavadora') {
 		const tipo = answers.tipo || 'automatica';
-		const personas = answers.personas || '3-4';
 		if (tipo === 'semiautomatica') {
-			if (personas === '1-2') return 'semiautomatica 7kg';
-			return 'semiautomatica 11kg';
+			return 'lavadora semiautomatica';
 		}
-		if (personas === '1-2') return 'automatica 14kg';
-		if (personas === '3-4') return 'automatica 16kg';
-		return 'automatica 17kg';
+		return 'lavadora automatica';
 	}
 	if (categoria === 'televisor') {
-		const tamano = answers.tamano || '50-55';
-		if (tamano === '32-43') return 'televisor 40';
-		if (tamano === '50-55') return 'televisor 50';
-		if (tamano === '65+') return 'televisor 65';
 		return 'televisor';
 	}
 	if (categoria === 'nevera') {
 		const presupuesto = answers.presupuesto || 'medio';
-		if (presupuesto === 'bajo') return 'nevera 197';          // menos de $1M
-		if (presupuesto === 'medio') return 'nevera 251';         // $1M-$2.5M
-		if (presupuesto === 'alto') return 'nevecon';             // $2.5M-$5M o sin límite
+		if (presupuesto === 'alto') return 'nevecon';
 		return 'nevera';
 	}
 	if (categoria === 'aire') {
@@ -403,7 +392,7 @@ export interface IAgent {
 function formatHistory(history: Array<{ direction: string; body: string }>): string {
 	if (!history || history.length === 0) return '';
 	return history
-		.slice(-6)
+		.slice(-20)
 		.map((m) => `${m.direction === 'INBOUND' ? 'Cliente' : 'Asistente'}: ${m.body}`)
 		.join('\n');
 }
@@ -427,7 +416,18 @@ function cleanResponse(raw: string): string {
 	if (!raw) return '';
 	let text = raw.trim();
 
-	// 0) CRÍTICO: Detectar fuga masiva de razonamiento (caso Gemma real).
+	// 0) Pre-limpieza de líneas de razonamiento interno del modelo (fuga de CoT en inglés)
+	const lines = text.split('\n');
+	const cleanedLines = lines.filter(line => {
+		const t = line.toLowerCase().trim();
+		if (t.includes('input message:') || t.includes('task:') || t.includes('result:') || t.includes('determination:') || t.includes('revised draft:') || t.includes('final polish:') || t.includes('checking constraints:')) {
+			return false;
+		}
+		return true;
+	});
+	text = cleanedLines.join('\n').trim();
+
+	// 0b) CRÍTICO: Detectar fuga masiva de razonamiento (caso Gemma real).
 	//    Si el texto contiene patrones de auto-evaluación interna junto con
 	//    contenido duplicado, extraer solo la primera respuesta limpia.
 	const fugaMasiva = /(?:Warm\/Clear\/Direct|Colombian Spanish|Payment\/Shipping|asterisks\/formatting|I must prioritize|the system prompt|the asstant|Revised Draft|Final Polish|Double check)/i;
@@ -1206,6 +1206,23 @@ export class VentasAgent implements IAgent {
 						},
 					};
 				}
+			} else if (stepAnterior.field === 'skuProducto' && context?.creditoOptions) {
+				const num = parseInt(message.trim(), 10);
+				const opciones = context.creditoOptions as Array<{ sku: string; name: string }>;
+				if (!isNaN(num) && num >= 1 && num <= opciones.length) {
+					const seleccion = opciones[num - 1];
+					creditoData.skuProducto = seleccion.sku;
+					creditoData.producto = seleccion.name;
+				} else {
+					const term = message.toLowerCase().trim();
+					const match = opciones.find(o => o.name.toLowerCase().includes(term));
+					if (match) {
+						creditoData.skuProducto = match.sku;
+						creditoData.producto = match.name;
+					} else {
+						creditoData.skuProducto = message.trim();
+					}
+				}
 			} else {
 				const valor = stepAnterior.opciones
 					? resolverOpcion(message, stepAnterior.opciones)
@@ -1231,6 +1248,40 @@ export class VentasAgent implements IAgent {
 			else if (completados === 11) transicion = 'Casi listo, solo faltan unos pocos datos más. ';
 			else if (completados >= 15) transicion = '¡Ya casi terminamos! ';
 			else if (completados > 0 && completados % 3 === 0) transicion = 'Perfecto. ';
+
+			if (siguientePaso.field === 'skuProducto') {
+				const queryTerm = creditoData.producto || 'electrodomestico';
+				let matchedProducts: any[] = [];
+				try {
+					matchedProducts = await wooCommerceService.searchProducts(queryTerm, 5);
+				} catch (e) {
+					console.error('Failed to search WooCommerce in credit flow', e);
+				}
+
+				if (matchedProducts && matchedProducts.length > 0) {
+					const opciones = matchedProducts.map((p) => ({
+						sku: p.sku || String(p.id),
+						name: p.name,
+					}));
+					const listStr = matchedProducts
+						.map((p, i) => {
+							const precio = p.price ? `$${Number(p.price).toLocaleString('es-CO')}` : 'Consultar';
+							return `${i + 1}️⃣ *${p.name}* - ${precio}`;
+						})
+						.join('\n');
+					
+					return {
+						response: `${transicion}Para tu solicitud de crédito, encontré estos modelos disponibles en JLC Electronics. ¿Cuál de estos te gustaría financiar? Escríbeme el número de tu opción: 😊\n\n${listStr}\n\nSi prefieres otro, dime el nombre o escribe "otro".`,
+						metadata: {
+							agentType: 'ventas',
+							flujo: 'credito',
+							creditoData,
+							creditoStep: indexReal + 1,
+							creditoOptions: opciones,
+						},
+					};
+				}
+			}
 
 			return {
 				response: `${transicion}${siguientePaso.pregunta}`,
@@ -1259,6 +1310,7 @@ export class VentasAgent implements IAgent {
 			metadata: {
 				agentType: 'ventas',
 				flujo: 'credito_completado',
+				modalidad: null,
 				creditoData,
 			},
 		};
@@ -1268,9 +1320,95 @@ export class VentasAgent implements IAgent {
 	async handle(message: string, context: any): Promise<AgentResponse> {
 		const lower = message.toLowerCase().trim();
 
-		// ── Flujo de crédito activo ────────────────────────────────────────────
-		if (context?.flujo === 'credito') {
-			return this.manejarFlujoCredito(message, context);
+		// ── Flujo de crédito activo o pausado ──────────────────────────────────
+		if (context?.flujo === 'credito' || context?.flujo === 'credito_pausado') {
+			if (context?.flujo === 'credito_pausado') {
+				const quiereContinuar = /s[ií]|dale|ok|bueno|claro|por favor|seguir|continuar|reproducir/i.test(lower);
+				if (quiereContinuar) {
+					context.flujo = 'credito';
+				} else {
+					context.flujo = null;
+					return {
+						response: 'Entendido, cancelamos el proceso de crédito. ¿En qué más te puedo ayudar hoy? 😊',
+						metadata: { agentType: 'ventas', flujo: null, modalidad: null },
+					};
+				}
+			}
+			if (context.flujo === 'credito') {
+				return this.manejarFlujoCredito(message, context);
+			}
+		}
+
+		// ── Flujo de pago o perfilando pausado ─────────────────────────────────
+		if (context?.flujo === 'pago_pausado') {
+			const quiereContinuar = /s[ií]|dale|ok|bueno|claro|por favor|seguir|continuar/i.test(lower);
+			if (quiereContinuar) {
+				context.flujo = context.flujoAnterior || 'seleccion_pago';
+			} else {
+				context.flujo = null;
+				return {
+					response: 'Listo, dejamos de lado el pago. ¿Qué otra duda o consulta tienes? 😊',
+					metadata: { agentType: 'ventas', flujo: null },
+				};
+			}
+		}
+
+		if (context?.flujo === 'perfilando_pausado') {
+			const quiereContinuar = /s[ií]|dale|ok|bueno|claro|por favor|seguir|continuar/i.test(lower);
+			if (quiereContinuar) {
+				context.flujo = 'perfilando';
+			} else {
+				context.flujo = null;
+				return {
+					response: 'Perfecto, cuéntame entonces en qué producto estás interesado y te busco las mejores opciones. 😊',
+					metadata: { agentType: 'ventas', flujo: null },
+				};
+			}
+		}
+
+		// ── Flujo de selección de pago ambiguo (Mejora #21 de info.md) ─────────
+		if (context?.flujo === 'seleccion_pago_ambiguo') {
+			const opcion = message.trim();
+			const ultimosProductos = context?.ultimaBusqueda?.results ?? [];
+			const index = parseInt(opcion, 10) - 1;
+			if (!isNaN(index) && index >= 0 && index < ultimosProductos.length) {
+				const selected = ultimosProductos[index];
+				const precioStr = selected.price ? ` tiene un valor de *$${Number(selected.price).toLocaleString('es-CO')}*` : '';
+				const linkStr = selected.permalink ? `\nAquí tienes el enlace del producto:\n${selected.permalink}` : '';
+				const ciudadStr = context?.ciudad ? ` con envío gratis a ${context.ciudad.charAt(0).toUpperCase() + context.ciudad.slice(1)}` : '';
+				const opcionPuntoFisico = context?.tieneCobertura ? '\n3️⃣ Paga en un punto físico' : '';
+				
+				return {
+					response: `¡Perfecto! El *${selected.name}*${precioStr}${ciudadStr}.${linkStr}\n\n¿Cómo prefieres realizar el pago? 💳\n1️⃣ Por transferencia bancaria (medios autorizados)\n2️⃣ Directamente en nuestra página web (PSE, Tarjeta, Nequi)${opcionPuntoFisico}\n\nEscríbeme el número de tu opción y te doy las instrucciones paso a paso. 😊`,
+					metadata: {
+						agentType: 'ventas',
+						flujo: 'seleccion_pago',
+						modalidad: 'contado',
+						ciudad: context?.ciudad,
+						ciudadValidada: true,
+						tieneCobertura: context?.tieneCobertura,
+						productoCompra: selected.name,
+						productoURL: selected.permalink,
+						ultimaBusqueda: context?.ultimaBusqueda,
+					},
+				};
+			} else {
+				const listaNombres = ultimosProductos.slice(0, 3).map((p: any, i: number) => {
+					const precio = p.price ? `$${Number(p.price).toLocaleString('es-CO')}` : 'Consultar';
+					return `${i + 1}️⃣ *${p.name}* (${precio})`;
+				}).join('\n');
+				return {
+					response: `Disculpa, no logré captar tu elección. Por favor escríbeme el número de la opción que prefieres:\n\n${listaNombres}`,
+					metadata: {
+						agentType: 'ventas',
+						flujo: 'seleccion_pago_ambiguo',
+						ciudad: context?.ciudad,
+						ciudadValidada: true,
+						tieneCobertura: context?.tieneCobertura,
+						ultimaBusqueda: context?.ultimaBusqueda,
+					},
+				};
+			}
 		}
 
 		// ── Pre-poblar ciudad desde UserData si ya está guardada ─────────────
@@ -1447,7 +1585,7 @@ export class VentasAgent implements IAgent {
 		}
 
 		// ── PASO 3: Si eligió crédito → iniciar formulario ──────────────────
-		if (context?.modalidad === 'credito') {
+		if (context?.modalidad === 'credito' && context?.flujo !== 'credito_completado') {
 			return {
 				response: `¡Dale, te ayudo con el crédito! 📋\n\nPara armar tu solicitud necesito algunos datos. Empecemos con lo básico:\n\n¿Cómo te llamas? (nombre completo)`,
 				metadata: {
@@ -1491,7 +1629,27 @@ export class VentasAgent implements IAgent {
 					(lowerMsg.includes('primero') && ultimosProductos[0] === p) ||
 					(lowerMsg.includes('segundo') && ultimosProductos[1] === p)
 				);
-				const selected = match ?? ultimosProductos[0];
+				
+				if (!match) {
+					const listaNombres = ultimosProductos.slice(0, 3).map((p: any, i: number) => {
+						const precio = p.price ? `$${Number(p.price).toLocaleString('es-CO')}` : 'Consultar';
+						return `${i + 1}️⃣ *${p.name}* (${precio})`;
+					}).join('\n');
+					
+					return {
+						response: `¡Me alegra que te decidas a comprar! 😊 Pero como te había mostrado varias opciones, ¿me confirmas cuál de ellas prefieres? Escríbeme el número:\n\n${listaNombres}\n\nQuedo atenta para darte las instrucciones exactas de pago.`,
+						metadata: {
+							agentType: 'ventas',
+							flujo: 'seleccion_pago_ambiguo',
+							ciudad: context?.ciudad,
+							ciudadValidada: true,
+							tieneCobertura: context?.tieneCobertura,
+							ultimaBusqueda: context?.ultimaBusqueda,
+						},
+					};
+				}
+				
+				const selected = match;
 				productoSolicitado = selected.name;
 				productoURL = selected.permalink;
 				pPrice = selected.price;
@@ -1866,7 +2024,7 @@ export class VentasAgent implements IAgent {
 			try {
 				// WooCommerce search
 				if (!products || products.length === 0) {
-					products = await wooCommerceService.searchProducts(terminoBusqueda, 6);
+					products = await wooCommerceService.searchProducts(terminoBusqueda, 20);
 				}
 
 				// 3) Fallback a búsqueda por palabras clave
@@ -1879,7 +2037,7 @@ export class VentasAgent implements IAgent {
 						.filter((w: string) => !['para', 'con', 'mas', 'más', 'que', 'una', 'uno', 'las', 'los', 'del', 'por', 'pero', 'esta', 'todo', 'como', 'entre', 'sobre', 'cuando', 'donde', 'tiene', 'ser', 'desde', 'hasta', 'cada'].includes(w));
 
 					for (const keyword of palabrasClave) {
-						const results = await wooCommerceService.searchProducts(keyword, 6);
+						const results = await wooCommerceService.searchProducts(keyword, 20);
 						if (results && results.length > 0) {
 							products = results;
 							break;
@@ -1925,8 +2083,14 @@ export class VentasAgent implements IAgent {
 		const userDataStr = buildUserDataContext(context?.userData);
 
 		const { system, user } = buildGemmaPrompt({
-			instruccion: `Eres ${AGENT_NAME}, asesora comercial de JLC Electronics Colombia.
-Tono cálido, cercano y femenino. Español colombiano natural. Mensajes cortos tipo WhatsApp.
+			instruccion: `Eres ${AGENT_NAME}, asesora comercial y experta en electrodomésticos de JLC Electronics Colombia.
+Personalidad y Estilo:
+- Tono sumamente cálido, amigable, cercano y femenino. Imagina que eres una amiga servicial que asesora al cliente para su hogar.
+- Español colombiano natural y coloquial (usa expresiones como "Ay, mira...", "Te cuento que...", "Qué pena contigo...").
+- Muestra criterio y opinión propia sobre los productos para guiar al cliente (ej. "Esa lavadora de 16kg te la súper recomiendo si tienes una familia grande, está muy bien valorada y tiene buena capacidad").
+- Evita sonar como un bot rígido. No uses frases genéricas como "¡Excelente elección!" ni hables como robot.
+- Mensajes cortos tipo WhatsApp (máximo 1-3 frases por respuesta).
+
 ${ciudadStr ? `Ciudad del cliente: ${ciudadStr}.` : ''} ${envioStr ? `Condición de envío: ${envioStr}.` : ''}
 ${userDataStr}
 REGLAS:
@@ -1936,7 +2100,7 @@ REGLAS:
 - NUNCA inventes productos, precios ni disponibilidad.
 - NUNCA compartas direcciones de agencias físicas.
 - NUNCA contradigas la condición de envío ya comunicada al cliente.
-- Máximo 3 líneas de texto, sin asteriscos ni formato.
+- Sin asteriscos ni lenguaje técnico que confunda.
 - Si el cliente ya dio datos (nombre, cédula, ciudad, presupuesto), úsalos sin pedirlos de nuevo.
 - Si el cliente pide un producto NUEVO o diferente al anterior, ayúdale con eso. No insistas con el producto anterior.
 - PROHIBIDO confirmar envío o despacho si el cliente no ha pagado. Di "tan pronto se confirme el pago".
