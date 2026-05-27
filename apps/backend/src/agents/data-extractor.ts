@@ -21,7 +21,12 @@ function determinarPipelineStage(userData: Record<string, any>, ultimaRespuesta:
 	const tieneCiudad = !!userData?.ciudad;
 
 	// VENTA_CERRADA: el cliente aceptó comprar, le dimos datos de pago
-	if (tieneNombre && tieneProducto && /comprar|pagar|compra|confirmo|ok|si|d[ée]le|listo|completa|adelante/i.test(historial.slice(-200))) {
+	// Requiere que haya un producto conocido Y que el historial reciente mencione pago/confirmación específica
+	if (
+		tieneNombre &&
+		tieneProducto &&
+		/(?:comprar|pagar|transferencia|consignaci[oó]n|confirmo|confirmar|listo el pago|ya pagu[eé]|comprobante|transacci[oó]n)/i.test(historial.slice(-300))
+	) {
 		return 'VENTA_CERRADA';
 	}
 
@@ -97,14 +102,21 @@ Campos a procesar (solo si están en el historial):
 - direccion: dirección de despacho (corregir si el cliente la cambia)
 - telefono: teléfono de contacto (corregir si especifica uno diferente)
 - presupuesto: presupuesto aproximado en pesos (corregir si cambia de opinión)
-- productoSolicitado: producto o referencia exacta que busca comprar (si cambia de opción de producto, actualízalo para reflejar el producto final de su elección)
+- productoSolicitado: nombre LIMPIO del producto o categoría que el cliente busca comprar.
+  REGLAS ESTRICTAS para productoSolicitado:
+  * Extrae SOLO el tipo de producto o nombre de referencia/modelo, SIN frases extra.
+  * Ejemplos correctos: "nevera", "lavadora", "televisor 55 pulgadas", "Lavadora Mabe 16kg"
+  * Ejemplos INCORRECTOS (no hagas esto): "esta JLC de 400 litros", "quiero esa nevera", "el producto de JLC"
+  * Si el cliente menciona una referencia exacta de un producto ya mostrado, usa solo el nombre del modelo.
+  * Si es una categoría general ("nevera", "lavadora"), usa solo esa palabra.
+  * Si el cliente cambia de producto, actualiza con el nombre limpio del nuevo producto.
 - ciudad: ciudad donde está o desea el envío (corregir si se cambia de destino)
 - departamento: departamento donde está o desea el envío (corregir si cambia)
 
 Responde SOLO con JSON válido, sin markdown, sin bloques de código, sin explicaciones ni texto extra:
 {"datos":{}}
 
-Ejemplo si hay datos nuevos o corregidos: {"datos":{"nombre":"Carlos Arturo","ciudad":"Medellín"}}
+Ejemplo si hay datos nuevos o corregidos: {"datos":{"nombre":"Carlos Arturo","ciudad":"Medellín","productoSolicitado":"nevera"}}
 Si todos los datos actuales son correctos y no hay nada nuevo ni incongruente que corregir: {"datos":{}}`;
 
 		const raw = await generateResponse(prompt);
