@@ -40,31 +40,32 @@ export class Orchestrator {
 	// intención de un "hola" y lo mande a servicio técnico.
 
 	/**
-	 * Versión pública: detecta si un mensaje es saludo/vago, sin importar el historial.
-	 * Usado por message.handler.ts para detectar nuevas sesiones de clientes recurrentes.
+	 * Versión pública estricta: solo detecta saludos EXPLÍCITOS, sin el catch-all de < 5 chars.
+	 * Usado por message.handler.ts para detectar nuevas sesiones sin falsos positivos.
 	 */
 	public esSaludo(message: string): boolean {
-		return this.revisarPatronesSaludo(message);
+		return this.revisarPatronesSaludo(message, true);
 	}
 
 	private isGreetingOrVague(message: string, hasHistory: boolean): boolean {
 		// Si ya hay historial, no es saludo inicial: dejamos que el clasificador decida.
 		if (hasHistory) return false;
 
-		return this.revisarPatronesSaludo(message);
+		return this.revisarPatronesSaludo(message, false);
 	}
 
 	/**
 	 * Lógica central de detección de saludos/mensajes vagos.
-	 * Separada para ser reutilizada sin el guard de hasHistory.
+	 * @param strict true = solo saludos explícitos (para nueva sesión), false = incluye catch-all < 5 chars (para primer mensaje)
 	 */
-	private revisarPatronesSaludo(message: string): boolean {
+	private revisarPatronesSaludo(message: string, strict: boolean): boolean {
 		const m = message.toLowerCase().trim();
 
 		// Mensaje vacío o solo emoji/símbolos
 		if (m.length === 0) return true;
 
 		// Lista de saludos / aperturas comunes (sin intención específica)
+		// NOTA: "1"-"7" NO están aquí — son opciones de menú manejadas por menuOptionToIntent
 		const greetings = [
 			'hola', 'holaa', 'holaaa', 'holi', 'oli', 'ola', 'hello', 'hi', 'hey',
 			'buenas', 'buenos dias', 'buenos días', 'buen dia', 'buen día',
@@ -76,7 +77,6 @@ export class Orchestrator {
 			'pregunta', 'consulta', 'quisiera saber', 'me gustaría saber',
 			'soy nuevo', 'soy nueva', 'primera vez', 'vengo de',
 			'quiero informacion', 'quiero información', 'necesito ayuda',
-			'1', '2', '3', '4', '5', '6', '7',   // opciones del menú de bienvenida
 			'?', '??', '...',
 		];
 
@@ -88,17 +88,21 @@ export class Orchestrator {
 		const firstWord = cleaned.split(/[\s,]+/)[0];
 		if (greetings.includes(firstWord) && cleaned.length < 30) return true;
 
-		// Patrones de presentación: "me llamo...", "soy...", etc.
-		const presentationPatterns = [
-			/^me\s+llamo/i, /^soy\s+[a-z]/i, /^mi\s+nombre/i,
-			/^vengo\s+por/i, /^quisiera\s+info/i, /^busco\s+info/i,
-		];
-		for (const pattern of presentationPatterns) {
-			if (pattern.test(cleaned) && cleaned.length < 40) return true;
-		}
+		// En modo NO estricto (primer mensaje, sin historial):
+		//   - Patrones de presentación: "me llamo...", "soy...", etc.
+		//   - Catch-all para mensajes muy cortos (< 5 chars) sin intención clara
+		if (!strict) {
+			const presentationPatterns = [
+				/^me\s+llamo/i, /^soy\s+[a-z]/i, /^mi\s+nombre/i,
+				/^vengo\s+por/i, /^quisiera\s+info/i, /^busco\s+info/i,
+			];
+			for (const pattern of presentationPatterns) {
+				if (pattern.test(cleaned) && cleaned.length < 40) return true;
+			}
 
-		// Muy corto y sin palabras clave de intención
-		if (cleaned.length < 5) return true;
+			// Muy corto y sin palabras clave de intención
+			if (cleaned.length < 5) return true;
+		}
 
 		return false;
 	}
