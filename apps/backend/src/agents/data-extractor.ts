@@ -127,9 +127,10 @@ Si todos los datos actuales son correctos y no hay nada nuevo ni incongruente qu
 		const datos: Record<string, string> = parsed.datos || {};
 
 		// ── 2. Guardar solo campos nuevos en UserData ──────────────────────
+		const CAMPOS_VALIDOS = new Set(['ciudad', 'departamento', 'nombre', 'cedula', 'productoSolicitado', 'presupuesto', 'direccion', 'telefono']);
 		const updateData: Record<string, any> = {};
 		for (const [key, value] of Object.entries(datos)) {
-			if (value && String(value) !== String(currentUserData[key] ?? '')) {
+			if (CAMPOS_VALIDOS.has(key) && value && String(value) !== String(currentUserData[key] ?? '')) {
 				updateData[key] = String(value);
 			}
 		}

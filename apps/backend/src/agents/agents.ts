@@ -70,146 +70,47 @@ interface ProfilingStep {
 
 const PROFILING_STEPS: Record<string, ProfilingStep[]> = {
 	lavadora: [
-		{ field: 'tipo', pregunta: '¿La prefieres automática o semiautomática? 🧺\n\n🔵 Automática\n🟢 Semiautomática\n🤷 No estoy seguro' },
-		{ field: 'presupuesto', pregunta: '¿Tienes en mente algún presupuesto aproximado para la lavadora, o prefieres ver todas las opciones disponibles? 💰' },
+		{ field: 'presupuesto', pregunta: '¿Tienes un presupuesto en mente para la lavadora? Así te muestro las que más te gusten 💕' },
 	],
 	televisor: [
-		{ field: 'espacio', pregunta: '¿Para qué espacio es? 📺\n\n1️⃣ Sala\n2️⃣ Habitación\n3️⃣ Cocina o negocio' },
-		{ field: 'tamano', pregunta: '¿Qué tamaño buscas? 📏\n\n1️⃣ 32" a 43"\n2️⃣ 50" a 55"\n3️⃣ 65" o más\n4️⃣ No estoy seguro' },
-		{ field: 'smart', pregunta: '¿Necesitas Smart TV con apps? 🌐\n\n1️⃣ Sí\n2️⃣ No importa' },
-		{ field: 'presupuesto', pregunta: '¿Tienes en mente algún presupuesto aproximado para el televisor, o prefieres ver todas las opciones disponibles? 💰' },
+		{ field: 'presupuesto', pregunta: 'Cuéntame, ¿cuánto pensabas invertir en tu nuevo televisor? Así te recomiendo los mejores 📺✨' },
 	],
 	nevera: [
-		{ field: 'presupuesto', pregunta: '¿Tienes algún presupuesto en mente para la nevera, o prefieres ver todas las opciones disponibles? 💰' },
-	],
-	aire: [
-		{ field: 'espacio', pregunta: '¿Para qué espacio? ❄️\n\n1️⃣ Habitación\n2️⃣ Sala o comedor\n3️⃣ Oficina o local' },
-		{ field: 'tamano', pregunta: '¿Tamaño del espacio? 📏\n\n1️⃣ Menos de 15 m²\n2️⃣ 15 a 25 m²\n3️⃣ Más de 25 m²' },
-		{ field: 'inverter', pregunta: '¿Inverter o convencional? 🟢\n\n1️⃣ Inverter (ahorra hasta 60% energía)\n2️⃣ Convencional (más económico)\n3️⃣ No estoy seguro' },
-		{ field: 'presupuesto', pregunta: '¿Tienes algún presupuesto pensado para el aire acondicionado, o prefieres ver todas las opciones disponibles? 💰' },
+		{ field: 'presupuesto', pregunta: '¿Qué presupuesto tienes para tu nevera? Para mostrarte las opciones que más te encanten 💙' },
 	],
 	audio: [
-		{ field: 'uso_audio', pregunta: '¿Para qué uso? 🎵\n\n1️⃣ Fiestas y eventos\n2️⃣ Sonido ambiental\n3️⃣ Karaoke o DJ\n4️⃣ Uso portátil' },
-		{ field: 'presupuesto', pregunta: '¿Tienes algún presupuesto aproximado para el parlante, o prefieres ver todas las opciones disponibles? 💰' },
+		{ field: 'presupuesto', pregunta: '¿Cuánto quieres gastar en tu equipo de sonido? Así te traigo las mejores opciones 🎵😊' },
 	],
 	cocina: [
-		{ field: 'personas', pregunta: '¿Para cuántas personas en tu hogar? 👨‍👩‍👧‍👧\n\n1️⃣ 1 a 2\n2️⃣ 3 a 4\n3️⃣ 5 o más' },
-		{ field: 'presupuesto', pregunta: '¿Presupuesto aproximado? 💰\n\n1️⃣ Menos de $200.000\n2️⃣ $200.000 – $500.000\n3️⃣ Más de $500.000' },
+		{ field: 'presupuesto', pregunta: '¿Tienes un presupuesto pensado para lo que buscas? Así te ayudo a encontrar justo lo que necesitas 👩‍🍳✨' },
 	],
 	ventilador: [
-		{ field: 'tipo_ventilador', pregunta: '¿Qué tipo? 🌬️\n\n1️⃣ De pedestal\n2️⃣ De torre\n3️⃣ De techo\n4️⃣ Portátil / de mesa' },
-		{ field: 'presupuesto', pregunta: '¿Presupuesto aproximado? 💰\n\n1️⃣ Menos de $150.000\n2️⃣ $150.000 – $300.000\n3️⃣ Más de $300.000' },
+		{ field: 'presupuesto', pregunta: '¿Qué presupuesto manejas para tu ventilador? Te muestro las opciones disponibles 🌬️💕' },
 	],
 	congelador: [
-		{ field: 'uso_negocio', pregunta: '¿Para hogar o negocio? ❄️\n\n1️⃣ Hogar\n2️⃣ Negocio / tienda' },
-		{ field: 'tamano', pregunta: '¿Tamaño? 📐\n\n1️⃣ Pequeño (menos de 300L)\n2️⃣ Mediano (300L – 500L)\n3️⃣ Grande (más de 500L)' },
-		{ field: 'presupuesto', pregunta: '¿Presupuesto aproximado? 💰\n\n1️⃣ Menos de $700.000\n2️⃣ $700.000 – $1.200.000\n3️⃣ Más de $1.200.000' },
+		{ field: 'presupuesto', pregunta: '¿Cuánto pensabas invertir en tu congelador? Así te enseño las alternativas que tenemos ❄️😊' },
 	],
 	vitrina: [
-		{ field: 'uso_negocio', pregunta: '¿Para hogar o negocio? 🏪\n\n1️⃣ Hogar\n2️⃣ Negocio / tienda' },
-		{ field: 'tamano', pregunta: '¿Tamaño? 📐\n\n1️⃣ Pequeña (menos de 300L)\n2️⃣ Mediana (300L – 500L)\n3️⃣ Grande (más de 500L)' },
-		{ field: 'presupuesto', pregunta: '¿Presupuesto aproximado? 💰\n\n1️⃣ Menos de $800.000\n2️⃣ $800.000 – $1.500.000\n3️⃣ Más de $1.500.000' },
+		{ field: 'presupuesto', pregunta: '¿Qué presupuesto tienes para tu vitrina? Te muestro las que tenemos disponibles 🏪✨' },
 	],
 	exhibidor: [
-		{ field: 'uso_negocio', pregunta: '¿Para hogar o negocio? 🏪\n\n1️⃣ Hogar\n2️⃣ Negocio / tienda' },
-		{ field: 'tamano', pregunta: '¿Tamaño? 📐\n\n1️⃣ Pequeño (menos de 200L)\n2️⃣ Grande (más de 200L)' },
-		{ field: 'presupuesto', pregunta: '¿Presupuesto aproximado? 💰\n\n1️⃣ Menos de $600.000\n2️⃣ $600.000 – $1.000.000\n3️⃣ Más de $1.000.000' },
+		{ field: 'presupuesto', pregunta: 'Cuéntame tu presupuesto para el exhibidor y te muestro opciones chéveres 🏪💕' },
 	],
 	minibar: [
-		{ field: 'uso_minibar', pregunta: '¿Para dónde es? 🧊\n\n1️⃣ Oficina\n2️⃣ Habitación\n3️⃣ Sala / bar' },
-		{ field: 'presupuesto', pregunta: '¿Presupuesto aproximado? 💰\n\n1️⃣ Menos de $500.000\n2️⃣ $500.000 – $800.000\n3️⃣ Más de $800.000' },
+		{ field: 'presupuesto', pregunta: '¿Tienes un presupuesto en mente para el minibar? Así te enseño los que más te gusten 🧊😊' },
 	],
 	otra: [
-		{ field: 'uso', pregunta: '¿Para qué lo vas a usar principalmente? 😊' },
-		{ field: 'presupuesto', pregunta: '¿Presupuesto aproximado? 💰' },
+		{ field: 'presupuesto', pregunta: '¿Qué presupuesto manejas? Así te ayudo a encontrar justo lo que buscas 💕' },
 	],
 };
 
 function resolverRespuestaPerfil(msg: string, field: string): string {
 	const lower = msg.toLowerCase().trim();
-	const num = lower.replace(/[^0-9]/g, '');
 
-	if (field === 'tipo') {
-		if (num === '1' || /auto/i.test(lower)) return 'automatica';
-		if (num === '2' || /semi/i.test(lower)) return 'semiautomatica';
-		if (num === '3' || /no s[eé]/i.test(lower) || /seguro/i.test(lower)) return 'no_sabe';
-		return 'no_sabe';
-	}
-	if (field === 'personas') {
-		if (num === '1' || /1|2|uno|dos/i.test(lower)) return '1-2';
-		if (num === '2' || /3|4|tres|cuatro/i.test(lower)) return '3-4';
-		if (num === '3' || /5|mas|más|cinco|muchos|familia|grande/i.test(lower)) return '5+';
-		// Intentar extraer número directo
-		const numPersonas = parseInt(lower.match(/\d+/)?.[0] || '');
-		if (numPersonas <= 2) return '1-2';
-		if (numPersonas <= 4) return '3-4';
-		if (numPersonas >= 5) return '5+';
-		return '3-4';
-	}
-	if (field === 'espacio') {
-		if (num === '1' || /sala|comedor|principal/i.test(lower)) return 'sala';
-		if (num === '2' || /habitaci[oó]n|cuarto|alcoba|dormitorio/i.test(lower)) return 'habitacion';
-		if (num === '3' || /cocina|negocio|oficina|local/i.test(lower)) return 'negocio';
-		if (/amplio|grande|espacioso/i.test(lower)) return 'amplio';
-		if (/reducido|pequeñ[oa]|chico|angosto/i.test(lower)) return 'reducido';
-		return 'sala';
-	}
-	if (field === 'tamano') {
-		if (num === '1' || /pequeñ[oa]|32|40|43|chico/i.test(lower)) return '32-43';
-		if (num === '2' || /mediano|mediana|50|55/i.test(lower)) return '50-55';
-		if (num === '3' || /grande|65|75|70|enorme|gigante/i.test(lower)) return '65+';
-		if (num === '4' || /no s[eé]/i.test(lower) || /seguro/i.test(lower)) return 'no_sabe';
-		// Detectar m² para aire acondicionado
-		if (/menos de 15|peque/i.test(lower)) return 'reducido';
-		if (/m[aá]s de 25|grande|amplio/i.test(lower)) return 'grande';
-		if (/15|20|25/i.test(lower)) return '15-25';
-		return 'no_sabe';
-	}
-	if (field === 'smart') {
-		if (num === '1' || /s[íi]|smart|aplicaciones|indispensable/i.test(lower)) return 'si';
-		if (num === '2' || /no|igual|da lo mismo/i.test(lower)) return 'no_importa';
-		return 'no_importa';
-	}
-	if (field === 'inverter') {
-		if (num === '1' || /inverter|ahorr/i.test(lower)) return 'inverter';
-		if (num === '2' || /convencional|normal|barat/i.test(lower)) return 'convencional';
-		if (num === '3' || /no s[eé]/i.test(lower) || /seguro/i.test(lower)) return 'no_sabe';
-		return 'no_sabe';
-	}
-	if (field === 'tipo_ventilador') {
-		if (num === '1' || /pedestal|parado/i.test(lower)) return 'pedestal';
-		if (num === '2' || /torre/i.test(lower)) return 'torre';
-		if (num === '3' || /techo/i.test(lower)) return 'techo';
-		if (num === '4' || /port[aá]til|mesa|escritorio/i.test(lower)) return 'portatil';
-		return 'pedestal';
-	}
-	if (field === 'uso_negocio') {
-		if (num === '1' || /hogar|casa|personal|familia/i.test(lower)) return 'hogar';
-		if (num === '2' || /negocio|tienda|comercial|local/i.test(lower)) return 'negocio';
-		return 'hogar';
-	}
-	if (field === 'uso') {
-		// Para categoría "otra": respuesta libre
-		return msg;
-	}
-	if (field === 'uso_audio') {
-		if (num === '1' || /fiesta|evento|discoteca|fiesta/i.test(lower)) return 'fiestas';
-		if (num === '2' || /ambiental|música de fondo|suave|música ambiental/i.test(lower)) return 'ambiental';
-		if (num === '3' || /karaoke|cantar|micrófono|microfono|dj/i.test(lower)) return 'karaoke';
-		if (num === '4' || /port[aá]til|bluetooth|personal|llevar|movil/i.test(lower)) return 'portatil';
-		return 'fiestas';
-	}
-	if (field === 'uso_minibar') {
-		if (num === '1' || /oficina|trabajo|escritorio/i.test(lower)) return 'oficina';
-		if (num === '2' || /habitaci[oó]n|cuarto|alcoba|dormitorio/i.test(lower)) return 'habitacion';
-		if (num === '3' || /sala|bar|sala estar|sala de estar|familia/i.test(lower)) return 'sala';
-		return 'oficina';
-	}
 	if (field === 'presupuesto') {
-		if (num === '1' || /menos|bajo|barato|econ[oó]mico/i.test(lower)) return 'bajo';
-		if (num === '2' || /medio|moderado|normal|800|900|mill[oó]n|entre/i.test(lower)) return 'medio';
-		if (num === '3' || /nevecon|alto|2\.5|3|4|5\s*mill/i.test(lower)) return 'alto';
-		if (num === '4' || /sin l[ií]mite|lo que sea|no importa|indistinto|necesario|ilimitado/i.test(lower)) return 'alto';
+		if (/menos|bajo|barato|econ[oó]mico/i.test(lower)) return 'bajo';
+		if (/medio|moderado|normal/i.test(lower)) return 'medio';
+		if (/nevecon|alto|sin l[ií]mite|lo que sea|no importa|ilimitado/i.test(lower)) return 'alto';
 		const numVal = lower.match(/([\d.]+)/);
 		if (numVal) {
 			const valor = parseFloat(numVal[1].replace(/\./g, ''));
@@ -227,12 +128,11 @@ function detectarCategoria(msg: string): string | null {
 	if (/lavadora|lavadoras|secadora|lavar/i.test(lower)) return 'lavadora';
 	if (/televisor|televisores|tv|pantalla|smart/i.test(lower)) return 'televisor';
 	if (/nevera|neveras|nevecon|nevecones|refrigerador/i.test(lower)) return 'nevera';
-	if (/aire|acondicionado|climatizacion|climatizaci[oó]n/i.test(lower)) return 'aire';
+	if (/ventilador|ventiladores|aire|acondicionado|climatizacion|climatizaci[oó]n|aire acondicionado port[aá]til|clima/i.test(lower)) return 'ventilador';
 	if (/congelador|congeladores/i.test(lower)) return 'congelador';
 	if (/vitrina|vitrinas/i.test(lower)) return 'vitrina';
 	if (/exhibidor|exhibidores/i.test(lower)) return 'exhibidor';
 	if (/minibar|mini\s*bar/i.test(lower)) return 'minibar';
-	if (/ventilador|ventiladores|aire acondicionado port[aá]til|clima/i.test(lower)) return 'ventilador';
 	if (/cabina|cabinas|parlante|parlantes|torre de sonido|torres de sonido|sonido|audio|bafle|bocina/i.test(lower)) return 'audio';
 	if (/cafetera|cafeteras|freidora|freidoras|hervidor|hervidores|horno|hornos|licuadora|licuadoras|olla|ollas|arrocera|exprimidor/i.test(lower)) return 'cocina';
 	if (CATEGORIAS_RE.test(msg)) return 'otra';
@@ -243,132 +143,24 @@ function detectarShortcuts(message: string, categoria: string): Record<string, s
 	const lower = message.toLowerCase();
 	const answers: Record<string, string> = {};
 
-	if (categoria === 'lavadora') {
-		if (/autom[aá]tic[oa]/i.test(lower)) answers.tipo = 'automatica';
-		if (/semi/i.test(lower)) answers.tipo = 'semiautomatica';
-		const kgMatch = lower.match(/(\d+)\s*(?:kg|kilos|k|lb|libras)/i);
-		if (kgMatch) {
-			const kg = parseInt(kgMatch[1]);
-			if (kg <= 9) answers.personas = '1-2';
-			else if (kg <= 13) answers.personas = '3-4';
-			else answers.personas = '5+';
-		}
-	} else if (categoria === 'televisor') {
-		if (/sala/i.test(lower)) answers.espacio = 'sala';
-		if (/habitaci[oó]n|cuarto|alcoba/i.test(lower)) answers.espacio = 'habitacion';
-		if (/cocina|negocio|oficina/i.test(lower)) answers.espacio = 'negocio';
-		const inchMatch = lower.match(/(\d+)\s*(?:pulgadas|pulg|\")/i);
-		if (inchMatch) {
-			const inch = parseInt(inchMatch[1]);
-			if (inch <= 43) answers.tamano = '32-43';
-			else if (inch <= 55) answers.tamano = '50-55';
-			else answers.tamano = '65+';
-		}
-		if (/grande/i.test(lower)) answers.tamano = '65+';
-		if (/pequeñ[oa]/i.test(lower)) answers.tamano = '32-43';
-		if (/mediano/i.test(lower)) answers.tamano = '50-55';
-	} else if (categoria === 'nevera') {
+	if (categoria === 'nevera') {
 		if (/nevecon|nevecones|doble puerta|side by side|french door/i.test(lower)) {
-			answers.presupuesto = 'alto'; // Nevecones siempre son gama alta
+			answers.presupuesto = 'alto';
 		}
-		if (/barato|econ[oó]mico|barata/i.test(lower)) answers.presupuesto = 'bajo';
-		if (/grande|familiar|ampli[oa]/i.test(lower)) answers.presupuesto = 'medio';
-	} else if (categoria === 'aire') {
-		if (/habitaci[oó]n|cuarto|alcoba/i.test(lower)) answers.espacio = 'habitacion';
-		if (/sala|comedor/i.test(lower)) answers.espacio = 'sala';
-		if (/oficina|local/i.test(lower)) answers.espacio = 'oficina';
-		if (/pequeñ[oa]/i.test(lower)) answers.tamano = 'reducido';
-		if (/grande|amplio/i.test(lower)) answers.tamano = 'grande';
-	} else if (categoria === 'audio') {
-		if (/fiesta|evento|fiesta|discoteca/i.test(lower)) answers.uso_audio = 'fiestas';
-		if (/ambiental|música de fondo|suave|hogar|casa/i.test(lower)) answers.uso_audio = 'ambiental';
-		if (/karaoke|cantar|micrófono|dj/i.test(lower)) answers.uso_audio = 'karaoke';
-		if (/port[aá]til|bluetooth|personal|llevar/i.test(lower)) answers.uso_audio = 'portatil';
-	} else if (categoria === 'cocina') {
-		if (/1|2|uno|dos|peque/i.test(lower)) answers.personas = '1-2';
-		if (/3|4|tres|cuatro|mediano/i.test(lower)) answers.personas = '3-4';
-		if (/5|mas|más|grande|familia/i.test(lower)) answers.personas = '5+';
-	} else if (categoria === 'ventilador') {
-		if (/pedestal|parado/i.test(lower)) answers.tipo_ventilador = 'pedestal';
-		if (/torre/i.test(lower)) answers.tipo_ventilador = 'torre';
-		if (/techo/i.test(lower)) answers.tipo_ventilador = 'techo';
-		if (/port[aá]til|mesa|escritorio|personal|usb|mini/i.test(lower)) answers.tipo_ventilador = 'portatil';
-	} else if (categoria === 'congelador' || categoria === 'vitrina' || categoria === 'exhibidor') {
-		if (/hogar|casa|personal|familia/i.test(lower)) answers.uso_negocio = 'hogar';
-		if (/negocio|tienda|comercial|local|venta|almac[eé]n/i.test(lower)) answers.uso_negocio = 'negocio';
-		if (/pequeñ[oa]|chico|mini/i.test(lower)) answers.tamano = 'pequeno';
-		if (/grande|amplio/i.test(lower)) answers.tamano = 'grande';
-	} else if (categoria === 'minibar') {
-		if (/oficina|trabajo/i.test(lower)) answers.uso_minibar = 'oficina';
-		if (/habitaci[oó]n|cuarto|alcoba/i.test(lower)) answers.uso_minibar = 'habitacion';
-		if (/sala|bar|compartir/i.test(lower)) answers.uso_minibar = 'sala';
 	}
-	// Presupuesto espontáneo genérico
 	if (/barato|econ[oó]mico|menos/i.test(lower)) answers.presupuesto = 'bajo';
 	if (/lo que sea|sin l[ií]mite|no importa|indistinto|el mejor|necesario/i.test(lower)) answers.presupuesto = 'alto';
 	return answers;
 }
 
 function obtenerTerminoBusquedaDesdePerfil(categoria: string, answers: Record<string, string>): string {
-	if (categoria === 'lavadora') {
-		const tipo = answers.tipo || 'automatica';
-		if (tipo === 'semiautomatica') {
-			return 'lavadora semiautomatica';
-		}
-		return 'lavadora automatica';
-	}
-	if (categoria === 'televisor') {
-		return 'televisor';
-	}
 	if (categoria === 'nevera') {
-		const presupuesto = answers.presupuesto || 'medio';
-		if (presupuesto === 'alto') return 'nevecon';
+		if (answers.presupuesto === 'alto') return 'nevecon';
 		return 'nevera';
 	}
-	if (categoria === 'aire') {
-		const tamano = answers.tamano || '15-25';
-		if (tamano === 'reducido') return '9000';
-		if (tamano === 'grande') return '18000';
-		return '12000';
-	}
-	if (categoria === 'audio') {
-		const uso = answers.uso_audio || '';
-		if (/fiesta|fiesta|karaoke/i.test(uso)) return 'cabina de sonido';
-		if (/portatil/i.test(uso)) return 'parlante portatil';
-		if (/ambiental/i.test(uso)) return 'parlante';
-		return 'parlante';
-	}
-	if (categoria === 'cocina') {
-		return 'electrodomesticos cocina';
-	}
-	if (categoria === 'ventilador') {
-		const tipo = answers.tipo_ventilador || 'pedestal';
-		if (tipo === 'torre') return 'ventilador torre';
-		if (tipo === 'techo') return 'ventilador';
-		if (tipo === 'portatil') return 'ventilador portatil';
-		return 'ventilador pedestal';
-	}
-	if (categoria === 'congelador') {
-		const tamano = answers.tamano || 'mediano';
-		if (tamano === 'pequeno') return 'congelador 300';
-		if (tamano === 'grande') return 'congelador 700';
-		return 'congelador';
-	}
-	if (categoria === 'vitrina') {
-		const tamano = answers.tamano || 'mediano';
-		if (tamano === 'pequeno') return 'vitrina 200';
-		if (tamano === 'grande') return 'vitrina 1000';
-		return 'vitrina';
-	}
-	if (categoria === 'exhibidor') {
-		const tamano = answers.tamano || 'grande';
-		if (tamano === 'pequeno') return 'exhibidor 200';
-		return 'exhibidor';
-	}
-	if (categoria === 'minibar') {
-		return 'minibar';
-	}
-	return answers.uso || '';
+	if (categoria === 'cocina') return 'electrodomesticos cocina';
+	if (categoria === 'audio') return 'parlante';
+	return categoria;
 }
 
 function camposPerfilCompletados(answers: Record<string, string>): number {
@@ -1602,7 +1394,7 @@ export class VentasAgent implements IAgent {
 		}
 
 		// ── PASO 4: Detectar intención de compra ─────────────────────────────
-		const quiereComprar = /\b(?:comprar(?:lo|la)?|lo quiero|la quiero|quiero esa|quiero este|quiero comprar|c[oó]mo (?:compro|hago|puedo pagar|le hago|le hago para pagar)|quiero pagar|proceder|concretar|compralo|c[oó]mpralo|reservar|apartar|d[áa]le|confirmo compra|ya lo quiero)\b|\bcompr(?:o|ar)\s+(?:esa|este|ese)\b|\b(?:el de \d+|el primero|el segundo|me quedo con|me interesa el|prefiero el)\b/i.test(message);
+		const quiereComprar = /\b(?:comprar(?:lo|la)?|lo quiero|la quiero|quiero esa|quiero este|quiero comprar|c[oó]mo (?:compro|hago|puedo pagar|le hago|le hago para pagar|pago)|quiero pagar|proceder|concretar|compralo|c[oó]mpralo|reservar|apartar|d[áa]le|confirmo compra|ya lo quiero|me gusta esa|me gusta esta|me gusta ese|esa me gusta|esta me gusta|si continuemos|si sigamos|sigamos adelante|seguimos|continuemos)\b|\bcompr(?:o|ar)\s+(?:esa|este|ese)\b|\b(?:el de \d+|el primero|el segundo|me quedo con|me interesa el|prefiero el)\b/i.test(message);
 
 		if (quiereComprar && context?.modalidad === 'contado') {
 			const tieneCobertura = context?.tieneCobertura;
@@ -1697,16 +1489,17 @@ export class VentasAgent implements IAgent {
 		if (context?.flujo === 'pago_web_paso') {
 			const pasoActual = context?.pasoWeb ?? 1;
 			const pasos = [
-				'Añade el producto al carrito de compras.',
-				'Ve al carrito o presiona directamente el botón "Comprar".',
-				'Rellena todos tus datos de envío y pago.',
-				'Realiza el pago a través de Wompi y listo, ¡ya quedó!',
+				'Abre el enlace del producto y dale clic en "Añadir al carrito" o "Comprar".',
+				'En el carrito, selecciona tu departamento y dale "Actualizar". Ahí te aparecen los municipios y ciudades.',
+				'Selecciona tu municipio, pon el código postal y dale "Actualizar" de nuevo. Ahí se calcula el flete y confirmas si tienes envío gratis.',
+				'Revisa que todo esté bien y dale "Proceder al pago". Rellena tus datos personales.',
+				'Elige tu método de pago en Wompi (PSE, tarjeta, Nequi) y confirma. ¡Listo, ya quedó! 🎉',
 			];
 			if (pasoActual <= pasos.length) {
-				const pasoMsg = `Paso ${pasoActual}: ${pasos[pasoActual - 1]}`;
+				const pasoMsg = `Paso ${pasoActual} de ${pasos.length}: ${pasos[pasoActual - 1]}`;
 				const siguiente = pasoActual < pasos.length
-					? '\n\nCuando termines, dime "listo" para continuar con el siguiente paso.'
-					: '\n\n¿Lograste completar el pago?';
+					? '\n\nDime "listo" cuando termines o "ayuda" si tienes algún problema. 😊'
+					: '\n\n¿Lograste completar el pago? Si tuviste algún inconveniente, cuéntame y te ayudo.';
 				return {
 					response: pasoMsg + siguiente,
 					metadata: {
@@ -1715,9 +1508,46 @@ export class VentasAgent implements IAgent {
 						pasoWeb: pasoActual + 1,
 						ciudad: context?.ciudad,
 						ciudadValidada: true,
+						productoURL: context?.productoURL,
 					},
 				};
 			}
+		}
+
+		// ── Manejo de pago completado o fallido ───────────────────────────────
+		if (context?.flujo === 'pago_completado') {
+			const noPudo = /no\s*(?:pude|puedo|logr[eé]|me\s*dej[oó])|problema|error|fallo|fall[oó]|no\s*sirv[eió]/i.test(lower);
+			if (noPudo) {
+				// Escalar a humano: notificar internamente
+				const ciudadCap = context?.ciudad ? context.ciudad.charAt(0).toUpperCase() + context.ciudad.slice(1) : '';
+				const productoInfo = context?.productoURL || 'producto pendiente';
+				const notificacion = `⚠️ Cliente desde ${ciudadCap} no pudo completar el pago web.\nProducto: ${productoInfo}\nRequiere asistencia.`;
+				try {
+					const WA_ESCALAMIENTO = process.env.WA_ESCALAMIENTO || '573187408190';
+					await sendWA(WA_ESCALAMIENTO, notificacion);
+				} catch { /* no bloquear */ }
+
+				return {
+					response: `No te preocupes, ya le notifiqué a nuestro equipo comercial para que te ayude directamente. Un asesor te va a escribir por aquí en un momentico. 💪`,
+					metadata: {
+						agentType: 'ventas',
+						flujo: null,
+						ciudad: context?.ciudad,
+						ciudadValidada: true,
+						escalado: true,
+					},
+				};
+			}
+			// Si dice que sí pudo → pedir comprobante
+			return {
+				response: `¡Qué bien! 🎉 Para confirmar tu pago, compárteme el comprobante o número de transacción por aquí (foto o pantallazo). Nuestro equipo lo verifica y te programamos el envío lo antes posible.`,
+				metadata: {
+					agentType: 'ventas',
+					flujo: 'esperando_comprobante',
+					ciudad: context?.ciudad,
+					ciudadValidada: true,
+				},
+			};
 		}
 
 		if (context?.flujo === 'pago_web') {
@@ -1797,12 +1627,13 @@ export class VentasAgent implements IAgent {
 			}
 			if (context?.tieneCobertura && /3|punto físico|físico|tienda/i.test(opcion)) {
 				return {
-					response: `Con gusto te reservamos el producto.\nPor favor compárteme tu nombre completo y número de cédula.`,
+					response: `¡Claro! Para reservarte el producto en el punto más cercano, necesito tu nombre completo y número de cédula. 😊`,
 					metadata: {
 						agentType: 'ventas',
 						flujo: 'pago_fisico',
 						ciudad: context?.ciudad,
 						ciudadValidada: true,
+						notificarPuntoFisico: true,
 					},
 				};
 			}
@@ -1858,9 +1689,8 @@ export class VentasAgent implements IAgent {
 
 			// Todos los pasos del perfil completados → recomendar productos
 			if (camposOk >= pasos.length || perfilState.step > pasos.length) {
-				const terminoBusqueda = obtenerTerminoBusquedaDesdePerfil(perfilState.categoria, perfilState.answers);
-				// Continuar al flujo de ventas normal con término de búsqueda derivado del perfil
-				// (colocamos terminoBusqueda en el contexto para que el flujo normal lo use)
+				// Priorizar el producto específico que mencionó antes del perfilamiento
+				const terminoBusqueda = (perfilState as any).terminoOriginal || obtenerTerminoBusquedaDesdePerfil(perfilState.categoria, perfilState.answers);
 				context = { ...context, flujo: null, terminoBusqueda };
 				if (perfilState.answers.presupuesto) {
 					datosPersonales.presupuesto = perfilState.answers.presupuesto;
@@ -1910,7 +1740,36 @@ export class VentasAgent implements IAgent {
 		if ((categoriaGeneral || catDetectada) && context?.flujo !== 'perfilando') {
 			const cat = catDetectada;
 			if (cat) {
-				// Detectar si el usuario ya dio información espontánea (shortcuts)
+				// ── BUSCAR PRIMERO EN WOOCOMMERCE antes de perfilar ──────────
+				// Si el producto no existe en el catálogo, no tiene sentido
+				// preguntar presupuesto. Primero verificamos disponibilidad.
+				const terminoParaBuscar = message.toLowerCase().replace(/(?:busco|quiero|necesito|tiene[ns]?|hay|venden|muestra|quisiera|me interesa)\s*/gi, '').trim();
+				let productosDisponibles: any[] = [];
+				try {
+					productosDisponibles = await wooCommerceService.searchProducts(terminoParaBuscar, 20);
+					// Si no encontró con el mensaje completo, intentar solo con la categoría
+					if (productosDisponibles.length === 0) {
+						productosDisponibles = await wooCommerceService.searchProducts(cat, 20);
+					}
+				} catch { /* continuar sin productos */ }
+
+				// Si NO hay productos en WooCommerce → decirlo de una vez, sin perfilar
+				if (productosDisponibles.length === 0) {
+					return {
+						response: `En este momento no tenemos ${terminoParaBuscar} disponible en nuestro catálogo. ¿Hay algo más en lo que te pueda ayudar? 😊`,
+						nextStage: 'PROPOSAL',
+						metadata: {
+							agentType: 'ventas',
+							ciudadValidada: context?.ciudadValidada,
+							ciudad: context?.ciudad,
+							modalidad: context?.modalidad,
+							tieneCobertura: context?.tieneCobertura,
+							...datosPersonales,
+						},
+					};
+				}
+
+				// SÍ hay productos → ahora sí decidir si perfilar o ir directo
 				const shortcuts = detectarShortcuts(message, cat);
 				const pasos = PROFILING_STEPS[cat] || PROFILING_STEPS.otra;
 				const campos = camposPerfilCompletados(shortcuts);
@@ -1923,16 +1782,19 @@ export class VentasAgent implements IAgent {
 					// Iniciar perfilamiento: encontrar el primer campo sin responder
 					const primerPaso = pasos.find(p => !shortcuts[p.field]);
 					if (primerPaso) {
+						const prodMatch = message.match(/(?:busco|quiero|necesito|tiene[ns]?|hay|venden|muestra|muestrame|quisiera|me interesa|info de|informacion de)\s*(?:un[oa]?|unas?|disponible)?\s*([a-záéíóúñÁÉÍÓÚÑ][a-záéíóúñÁÉÍÓÚÑ\s]{2,40})/i);
 						return {
 							response: primerPaso.pregunta,
 							metadata: {
 								agentType: 'ventas',
 								flujo: 'perfilando',
-								perfilState: { categoria: cat, step: pasos.indexOf(primerPaso) + 1, answers: shortcuts },
+								perfilState: { categoria: cat, step: pasos.indexOf(primerPaso) + 1, answers: shortcuts, terminoOriginal: prodMatch ? prodMatch[1].trim().toLowerCase() : null },
 								ciudad: context?.ciudad,
 								ciudadValidada: true,
 								tieneCobertura: context?.tieneCobertura,
 								modalidad: context?.modalidad,
+								// Guardar los productos ya encontrados para no re-buscar
+								productosPreCargados: productosDisponibles,
 								...datosPersonales,
 							},
 						};
@@ -1949,8 +1811,9 @@ export class VentasAgent implements IAgent {
 			? 'tienes envío gratis'
 			: 'pago de contado (flete por Coordinadora a cargo del cliente)';
 
-		// Detectar si pide más opciones
+		// Detectar si pide más opciones O más económicas/baratas de la misma categoría
 		const pideMas = /(?:tienes\s*mas|hay\s*m[áa]s|m[áa]s\s*opciones|otr[oa]s?\s*opciones|quiero\s*ver\s*m[áa]s|mu[ée]strame\s*m[áa]s|busco\s*otr[oa]|alg[úu]n\s*otr[oa]|otr[oa]s?\s*opciones|diferente)/i.test(message);
+		const pideMasEconomico = /(?:m[áa]s\s*(?:econ[oó]mic[oa]s?|barat[oa]s?|econ[oó]mic[oa])|algo\s*(?:m[áa]s\s*)?(?:econ[oó]mico|barato)|m[áa]s\s*barato|menos\s*costoso|de\s*menor\s*precio|hay\s*(?:algo\s*)?m[áa]s\s*barat)/i.test(message);
 
 		let products: any[] = [];
 		let hayProductos = false;
@@ -1990,19 +1853,47 @@ export class VentasAgent implements IAgent {
 			};
 		}
 
-		if (pideMas) {
+		if (pideMas || pideMasEconomico) {
 			const busquedaGuardada = context?.ultimaBusqueda;
 			if (busquedaGuardada?.results?.length > 0) {
 				products = busquedaGuardada.results;
-				productoIndex = (busquedaGuardada.productoIndex ?? 0) + 1;
-				if (productoIndex >= products.length) {
-					// Se agotaron los productos guardados → re-consultar WooCommerce
-					const terminoReSearch = busquedaGuardada.categoria || context?.terminoBusqueda || '';
-					if (terminoReSearch) {
-						products = [];
-						terminoBusqueda = terminoReSearch;
-					} else {
-						productoIndex = products.length;
+
+				if (pideMasEconomico) {
+					// Ordenar por precio ascendente y mostrar los más baratos que aún no se mostraron
+					products = [...products].sort((a: any, b: any) => {
+						const pa = parseFloat(a.price || '999999999');
+						const pb = parseFloat(b.price || '999999999');
+						return pa - pb;
+					});
+					productoIndex = 0; // Empezar desde el más barato
+					
+					// También re-buscar en WooCommerce con término + "economica" para ampliar resultados
+					const catBusqueda = busquedaGuardada.categoria || context?.terminoBusqueda || '';
+					if (catBusqueda) {
+						try {
+							const masProductos = await wooCommerceService.searchProducts(catBusqueda, 20);
+							if (masProductos?.length > 0) {
+								// Combinar sin duplicados, ordenar por precio
+								const idsExistentes = new Set(products.map((p: any) => p.id));
+								const nuevos = masProductos.filter((p: any) => !idsExistentes.has(p.id));
+								products = [...products, ...nuevos].sort((a: any, b: any) => {
+									const pa = parseFloat(a.price || '999999999');
+									const pb = parseFloat(b.price || '999999999');
+									return pa - pb;
+								});
+							}
+						} catch { /* continuar con lo que tenemos */ }
+					}
+				} else {
+					productoIndex = (busquedaGuardada.productoIndex ?? 0) + 1;
+					if (productoIndex >= products.length) {
+						const terminoReSearch = busquedaGuardada.categoria || context?.terminoBusqueda || '';
+						if (terminoReSearch) {
+							products = [];
+							terminoBusqueda = terminoReSearch;
+						} else {
+							productoIndex = products.length;
+						}
 					}
 				}
 			} else {
@@ -2016,13 +1907,15 @@ export class VentasAgent implements IAgent {
 		}
 
 		if (products.length === 0) {
-			// Verificar si el usuario preguntó por un producto que no está en nuestro catálogo
-			const palabrasMensaje = terminoBusqueda.toLowerCase().replace(/[.,!?¡¿]+/g, '').split(/\s+/);
-			const mencionaAlgunaCategoria = palabrasMensaje.some((p: string) => CATEGORIAS_RE.test(p));
 			const esConsultaProducto = /(?:tiene[ns]?|hay|venden|busco|quiero|necesito|me interesa|consulta|precio|cu[aá]nto)/i.test(message);
 
-			try {
-				// WooCommerce search
+			// Usar productos pre-cargados del perfilamiento si existen
+			if (context?.productosPreCargados?.length > 0) {
+				products = context.productosPreCargados;
+				hayProductos = true;
+			} else {
+				try {
+					// WooCommerce search
 				if (!products || products.length === 0) {
 					products = await wooCommerceService.searchProducts(terminoBusqueda, 20);
 				}
@@ -2046,11 +1939,11 @@ export class VentasAgent implements IAgent {
 				}
 
 				// Si el usuario preguntó específicamente por un producto que no está en categorías
-				// y no se encontró nada, no hacemos fallback a productos generales
-				if ((!products || products.length === 0) && esConsultaProducto && !mencionaAlgunaCategoria) {
-					const nombreProducto = busquedaMatch?.[1]?.trim().toLowerCase() || 'ese producto';
+				// y no se encontró nada, informar honestamente SIN recomendar otros productos
+				if ((!products || products.length === 0) && esConsultaProducto) {
+					const nombreProducto = busquedaMatch?.[1]?.trim().toLowerCase() || terminoBusqueda.toLowerCase();
 					return {
-						response: `Lo siento, no tenemos ${nombreProducto} en nuestro catálogo actualmente. ¿Te puedo ayudar con otro producto? 🛒`,
+						response: `En este momento no tenemos ${nombreProducto} disponible en nuestro catálogo. ¿Hay algo más en lo que te pueda ayudar? 😊`,
 						nextStage: 'PROPOSAL',
 						metadata: {
 							agentType: 'ventas',
@@ -2062,14 +1955,26 @@ export class VentasAgent implements IAgent {
 				}
 
 				if (!products || products.length === 0) {
-					const generalProducts = await wooCommerceService.getProducts(10);
-					products = generalProducts.filter((p) => p.name && p.permalink);
+					// No hacer fallback a productos aleatorios — preguntar qué busca
+					return {
+						response: `Cuéntame, ¿qué producto te gustaría ver? Tenemos neveras, lavadoras, televisores, congeladores, parlantes, y más. 😊`,
+						nextStage: 'PROPOSAL',
+						metadata: {
+							agentType: 'ventas',
+							ciudadValidada: context?.ciudadValidada,
+							ciudad: context?.ciudad,
+							modalidad: context?.modalidad,
+							tieneCobertura: context?.tieneCobertura,
+							...datosPersonales,
+						},
+					};
 				}
 
 				hayProductos = products?.length > 0;
 			} catch {
 				// products se queda como []
 			}
+			} // close else (no productosPreCargados)
 		}
 
 		// Formatear productos para el prompt de la IA
@@ -2104,7 +2009,11 @@ REGLAS:
 - Si el cliente ya dio datos (nombre, cédula, ciudad, presupuesto), úsalos sin pedirlos de nuevo.
 - Si el cliente pide un producto NUEVO o diferente al anterior, ayúdale con eso. No insistas con el producto anterior.
 - PROHIBIDO confirmar envío o despacho si el cliente no ha pagado. Di "tan pronto se confirme el pago".
-- Si el cliente dice que ya pagó, pide el comprobante o número de transacción.`,
+- Si el cliente dice que ya pagó, pide el comprobante o número de transacción.
+- NUNCA compartas números de WhatsApp de cartera, correos de facturación ni números de soporte de pago. Esos datos son exclusivos del área de cartera.
+- NUNCA digas "generé tu orden de compra" ni "tu orden quedó lista". Di que el producto queda reservado pendiente a su pago.
+- Si NO encontraste el producto exacto que busca, NO le recomiendes productos de otra categoría. Solo dile que no lo tenemos disponible y pregunta si busca algo más.
+- NUNCA recomiendes productos que el cliente NO pidió (ej: si busca cafetera, NO ofrezcas arrocera ni licuadora).`,
 			ejemplos: [
 				{
 					cliente: 'Busco una nevera',
@@ -2475,48 +2384,93 @@ export class DistribuidoresAgent implements IAgent {
 
 // ─── AGENTE MEDIOS DE PAGO ───────────────────────────────────────────────────
 //
-// Mejora #11: entregar automáticamente convenios, cuentas bancarias,
-// medios de recaudo y líneas para envío de soportes.
+// Si el cliente llega a este agente CON un producto seleccionado (desde ventas),
+// mostrar las opciones de pago con el link del producto y la imagen de medios.
+// Si llega SIN producto (pregunta genérica), dar info general.
 
 export class PagosAgent implements IAgent {
 	name = 'Medios de Pago';
 
 	async handle(message: string, context: any): Promise<AgentResponse> {
-		const userDataCtx = buildUserDataContext(context?.userData);
-		const datos = `Medios de pago JLC Electronics:${userDataCtx}
-1) En línea en https://jlc-electronics.com/ con PSE, tarjeta de crédito o débito.
-2) En punto físico (el asesor indica la tienda más cercana según ciudad).
-3) Crédito / cuotas: gestionado por Cristina al WhatsApp +57 318 740 8190.
-4) Para envío de soportes de pago: WhatsApp cartera +57 314 422 9949 o +57 315 721 2367.
-5) Correo para soporte de pago y facturación: callcenter5@electromillonaria.co.`;
+		// ── Detectar si hay un producto activo en el contexto ──────────────
+		const ultimosProductos = context?.ultimaBusqueda?.results ?? [];
+		const productoURL = context?.productoURL ?? ultimosProductos[0]?.permalink;
+		const productoNombre = context?.productoCompra ?? ultimosProductos[0]?.name;
+		const tieneCobertura = context?.tieneCobertura ?? false;
+		const ciudadStr = context?.ciudad
+			? context.ciudad.charAt(0).toUpperCase() + context.ciudad.slice(1)
+			: '';
 
+		// ── Si hay producto seleccionado → flujo de pago estructurado ─────
+		if (productoURL || productoNombre) {
+			const linkProducto = productoURL ? `\nLink de tu producto: ${productoURL}` : '';
+			const opcionPuntoFisico = tieneCobertura
+				? '\n3️⃣ Pagar en un punto físico (solo necesito tu nombre y cédula para reservarlo)'
+				: '';
+			const envioInfo = tieneCobertura
+				? `con envío gratis a ${ciudadStr}`
+				: ciudadStr ? `(envío por Coordinadora a ${ciudadStr})` : '';
+
+			return {
+				response: `Para pagar tu *${productoNombre || 'producto'}* ${envioInfo}, estas son tus opciones:${linkProducto}\n\n1️⃣ Por transferencia bancaria (medios autorizados)\nhttps://jlc-electronics.com/wp-content/uploads/2026/05/Medios_de_pago.jpeg\n\n2️⃣ Pagar directamente en la página web (PSE, Tarjeta, Nequi)${opcionPuntoFisico}\n\nEscríbeme el número de tu opción y te acompaño paso a paso. 😊`,
+				metadata: {
+					agentType: 'ventas', // Redirigir al agente de ventas para manejar el flujo
+					flujo: 'seleccion_pago',
+					modalidad: 'contado',
+					ciudad: context?.ciudad,
+					ciudadValidada: true,
+					tieneCobertura,
+					productoURL,
+					productoCompra: productoNombre,
+					ultimaBusqueda: context?.ultimaBusqueda,
+				},
+			};
+		}
+
+		// ── Sin producto → flujo genérico de medios de pago ───────────────
+		const lower = message.toLowerCase();
+
+		// Pregunta sobre soportes de pago
+		if (/soporte|comprobante|donde\s*env[ií]o|a\s*d[oó]nde\s*mando/i.test(lower)) {
+			return {
+				response: `Envía tu soporte de pago al WhatsApp de cartera: +57 314 422 9949 o +57 315 721 2367, o al correo callcenter5@electromillonaria.co. 😊`,
+				metadata: { agentType: 'pagos' },
+			};
+		}
+
+		// Pregunta sobre crédito
+		if (/cr[eé]dito|cuotas|financiar|financiaci[oó]n/i.test(lower)) {
+			return {
+				response: `El crédito lo gestiona nuestro equipo comercial. ¿Quieres que te ayude a iniciar la solicitud de crédito desde aquí?`,
+				metadata: { agentType: 'pagos' },
+			};
+		}
+
+		// Pregunta genérica de medios de pago
+		const userDataCtx = buildUserDataContext(context?.userData);
 		const { system, user } = buildGemmaPrompt({
-			instruccion: `Eres asistente de medios de pago de Electrodomésticos JLC. Entrega SIEMPRE la información concreta de cómo pagar según lo que pide el cliente. No digas "un asesor te contactará"; da los datos directamente. Datos: ${datos}`,
+			instruccion: `Eres Sara, asesora de medios de pago de JLC Electronics. Tono cálido y femenino. Español colombiano.
+Entrega la información concreta de cómo pagar. No digas "un asesor te contactará".
+${userDataCtx}
+Medios de pago:
+1) En línea en https://jlc-electronics.com/ con PSE, tarjeta de crédito o débito.
+2) En punto físico (según disponibilidad en la ciudad del cliente).
+3) Crédito/cuotas: se gestiona desde el chat (iniciar solicitud de crédito).
+4) Imagen de medios autorizados: https://jlc-electronics.com/wp-content/uploads/2026/05/Medios_de_pago.jpeg
+REGLAS:
+- Si el cliente pregunta cómo pagar, muestra la imagen de medios de pago.
+- Mensajes cortos tipo WhatsApp, sin asteriscos.
+- No menciones números de cartera a menos que pregunten por soportes de pago.`,
 			ejemplos: [
 				{
 					cliente: '¿Cómo puedo pagar?',
 					asistente:
-						'Tienes dos opciones rápidas: 1) En línea en https://jlc-electronics.com/ con PSE, tarjeta de crédito o débito. 2) En punto físico. ¿Cuál prefieres o desde qué ciudad escribes?',
+						'Aquí están nuestros medios de pago autorizados:\nhttps://jlc-electronics.com/wp-content/uploads/2026/05/Medios_de_pago.jpeg\n\nTambién puedes pagar en línea en https://jlc-electronics.com/ con PSE, tarjeta o Nequi. ¿Ya tienes un producto seleccionado?',
 				},
 				{
 					cliente: '¿Aceptan tarjeta de crédito?',
 					asistente:
-						'¡Sí! Al pagar en https://jlc-electronics.com/ puedes usar tarjeta de crédito, débito o PSE. ¿Ya tienes el producto seleccionado?',
-				},
-				{
-					cliente: 'Quiero pagar a crédito',
-					asistente:
-						'El crédito lo gestiona Cristina. Escríbele al WhatsApp +57 318 740 8190 con el producto que te interesa y ella te guía paso a paso.',
-				},
-				{
-					cliente: '¿A dónde mando el soporte de pago?',
-					asistente:
-						'Envía tu soporte de pago al WhatsApp de cartera: +57 314 422 9949 o +57 315 721 2367, o al correo callcenter5@electromillonaria.co.',
-				},
-				{
-					cliente: '¿Tienen convenio con Efecty o Baloto?',
-					asistente:
-						'En este momento los medios habilitados son PSE, tarjeta de crédito/débito en línea y pago en punto físico. Para confirmar convenios adicionales, consulta directamente en https://jlc-electronics.com/ o escribe a Cristina al +57 318 740 8190.',
+						'Sí, al pagar en https://jlc-electronics.com/ puedes usar tarjeta de crédito, débito o PSE a través de Wompi. ¿Te ayudo a seleccionar un producto?',
 				},
 			],
 			historial: formatHistory(context?.history),

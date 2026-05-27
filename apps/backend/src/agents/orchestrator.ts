@@ -39,11 +39,27 @@ export class Orchestrator {
 	// vago, va al agente de Bienvenida. Esto evita que el modelo "adivine" la
 	// intención de un "hola" y lo mande a servicio técnico.
 
-	private isGreetingOrVague(message: string, hasHistory: boolean): boolean {
-		const m = message.toLowerCase().trim();
+	/**
+	 * Versión pública estricta: solo detecta saludos EXPLÍCITOS, sin el catch-all de < 5 chars.
+	 * Usado por message.handler.ts para detectar nuevas sesiones sin falsos positivos.
+	 */
+	public esSaludo(message: string): boolean {
+		return this.revisarPatronesSaludo(message, true);
+	}
 
+	private isGreetingOrVague(message: string, hasHistory: boolean): boolean {
 		// Si ya hay historial, no es saludo inicial: dejamos que el clasificador decida.
 		if (hasHistory) return false;
+
+		return this.revisarPatronesSaludo(message, false);
+	}
+
+	/**
+	 * Lógica central de detección de saludos/mensajes vagos.
+	 * @param strict true = solo saludos explícitos (para nueva sesión), false = incluye catch-all < 5 chars (para primer mensaje)
+	 */
+	private revisarPatronesSaludo(message: string, strict: boolean): boolean {
+		const m = message.toLowerCase().trim();
 
 		// Mensaje vacío o solo emoji/símbolos
 		if (m.length === 0) return true;
@@ -60,8 +76,6 @@ export class Orchestrator {
 			'pregunta', 'consulta', 'quisiera saber', 'me gustaría saber',
 			'soy nuevo', 'soy nueva', 'primera vez', 'vengo de',
 			'quiero informacion', 'quiero información', 'necesito ayuda',
-			'1', '2', '3', '4', '5', '6', '7',   // opciones del menú de bienvenida
-			'?', '??', '...',
 		];
 
 		// Limpiar puntuación final para comparar
@@ -72,17 +86,21 @@ export class Orchestrator {
 		const firstWord = cleaned.split(/[\s,]+/)[0];
 		if (greetings.includes(firstWord) && cleaned.length < 30) return true;
 
-		// Patrones de presentación: "me llamo...", "soy...", etc.
-		const presentationPatterns = [
-			/^me\s+llamo/i, /^soy\s+[a-z]/i, /^mi\s+nombre/i,
-			/^vengo\s+por/i, /^quisiera\s+info/i, /^busco\s+info/i,
-		];
-		for (const pattern of presentationPatterns) {
-			if (pattern.test(cleaned) && cleaned.length < 40) return true;
-		}
+		// En modo NO estricto (primer mensaje, sin historial):
+		//   - Patrones de presentación: "me llamo...", "soy...", etc.
+		//   - Catch-all para mensajes muy cortos (< 5 chars) sin intención clara
+		if (!strict) {
+			const presentationPatterns = [
+				/^me\s+llamo/i, /^soy\s+[a-z]/i, /^mi\s+nombre/i,
+				/^vengo\s+por/i, /^quisiera\s+info/i, /^busco\s+info/i,
+			];
+			for (const pattern of presentationPatterns) {
+				if (pattern.test(cleaned) && cleaned.length < 40) return true;
+			}
 
-		// Muy corto y sin palabras clave de intención
-		if (cleaned.length < 5) return true;
+			// Muy corto y sin palabras clave de intención
+			if (cleaned.length < 5) return true;
+		}
 
 		return false;
 	}
@@ -223,7 +241,7 @@ Categoría:`;
 		message: string,
 		context: any
 	): Promise<{ agentType: string; response: string; metadata?: Record<string, any> }> {
-		const hasHistory = Array.isArray(context?.history) && context.history.length > 0;
+		const hasHistory = Array.isArray(context?.history) && context.history.length > 0 && context?.nuevaSesion !== true;
 
 		// ─── SALIDA DE EMERGENCIA (ESCAPE HATCH) ───
 		// Si el usuario quiere cancelar o cambiar de tema, rompemos cualquier flujo activo
@@ -250,7 +268,7 @@ Categoría:`;
 
 		if (flujoActivo) {
 			// Mapear flujo activo al agente correspondiente
-			if (/^credito/.test(flujoActivo) || flujoActivo === 'sin_cobertura' || flujoActivo === 'contado_sin_cobertura' || flujoActivo === 'esperando_ciudad' || flujoActivo === 'credito_perfilando' || flujoActivo === 'esperando_modalidad' || flujoActivo === 'perfilando_producto' || flujoActivo === 'perfilando_presupuesto' || flujoActivo === 'perfilando' || flujoActivo === 'seleccion_pago' || flujoActivo === 'pago_web' || flujoActivo === 'pago_web_paso' || flujoActivo === 'pago_medios' || flujoActivo === 'pago_fisico') {
+			if (/^credito/.test(flujoActivo) || flujoActivo === 'sin_cobertura' || flujoActivo === 'contado_sin_cobertura' || flujoActivo === 'esperando_ciudad' || flujoActivo === 'credito_perfilando' || flujoActivo === 'esperando_modalidad' || flujoActivo === 'perfilando_producto' || flujoActivo === 'perfilando_presupuesto' || flujoActivo === 'perfilando' || flujoActivo === 'seleccion_pago' || flujoActivo === 'seleccion_pago_ambiguo' || flujoActivo === 'pago_web' || flujoActivo === 'pago_web_paso' || flujoActivo === 'pago_medios' || flujoActivo === 'pago_fisico' || flujoActivo === 'pago_completado' || flujoActivo === 'esperando_comprobante' || flujoActivo === 'credito_pausado' || flujoActivo === 'pago_pausado' || flujoActivo === 'perfilando_pausado') {
 				intent = 'ventas';
 			} else if (/^repuesto/.test(flujoActivo)) {
 				intent = 'repuestos';
@@ -260,6 +278,13 @@ Categoría:`;
 			}
 		} else {
 			intent = await this.classifyIntent(message, hasHistory);
+
+			// ── CORRECCIÓN: Si el intent es 'pagos' pero hay un producto activo
+			// en el contexto de ventas, mantener en ventas para que el flujo de
+			// pago integrado maneje la transacción (no el agente genérico de pagos).
+			if (intent === 'pagos' && context?.ultimaBusqueda?.results?.length > 0 && context?.modalidad === 'contado') {
+				intent = 'ventas';
+			}
 		}
 
 		const agent = this.agents[intent] || this.agents.ventas;
