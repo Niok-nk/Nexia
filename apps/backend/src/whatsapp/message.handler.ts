@@ -337,6 +337,31 @@ export async function processIncomingMessage(
 	if (lead) {
 		const ud: Record<string, any> = {};
 
+		// ── Notificaciones internas (punto físico, escalamiento) ──────────
+		if (metadata?.notificarPuntoFisico || metadata?.escalado) {
+			const WA_ESCALAMIENTO = process.env.WA_ESCALAMIENTO || '573187408190';
+			const ciudadInfo = metadata?.ciudad || userData.ciudad || 'ciudad no especificada';
+			const productoInfo = metadata?.productoCompra || userData.productoSolicitado || 'producto pendiente';
+			const nombreInfo = userData.nombre || 'nombre pendiente';
+
+			let notifMsg = '';
+			if (metadata?.notificarPuntoFisico) {
+				notifMsg = `🏪 PUNTO FÍSICO\nCliente: ${nombreInfo}\nCiudad: ${ciudadInfo}\nProducto: ${productoInfo}\nTeléfono: ${phone}\nQuiere pagar en punto físico. Requiere asistencia.`;
+			} else if (metadata?.escalado) {
+				notifMsg = `⚠️ ESCALAMIENTO\nCliente: ${nombreInfo}\nCiudad: ${ciudadInfo}\nProducto: ${productoInfo}\nTeléfono: ${phone}\nNo pudo completar el pago web. Requiere asistencia.`;
+			}
+
+			if (notifMsg) {
+				try {
+					const { sendMessage: sendWADirect } = await import('./whatsapp.js');
+					await sendWADirect(WA_ESCALAMIENTO, notifMsg);
+					logger.info({ phone, tipo: metadata?.notificarPuntoFisico ? 'punto_fisico' : 'escalamiento' }, 'Notificación interna enviada');
+				} catch (e) {
+					logger.error({ error: e }, 'Error enviando notificación interna');
+				}
+			}
+		}
+
 		// Prioridad: metadata del agente > detección directa del mensaje > UserData previo
 		if (metadata?.ciudad) {
 			ud.ciudad = metadata.ciudad;

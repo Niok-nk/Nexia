@@ -1394,7 +1394,7 @@ export class VentasAgent implements IAgent {
 		}
 
 		// ── PASO 4: Detectar intención de compra ─────────────────────────────
-		const quiereComprar = /\b(?:comprar(?:lo|la)?|lo quiero|la quiero|quiero esa|quiero este|quiero comprar|c[oó]mo (?:compro|hago|puedo pagar|le hago|le hago para pagar)|quiero pagar|proceder|concretar|compralo|c[oó]mpralo|reservar|apartar|d[áa]le|confirmo compra|ya lo quiero)\b|\bcompr(?:o|ar)\s+(?:esa|este|ese)\b|\b(?:el de \d+|el primero|el segundo|me quedo con|me interesa el|prefiero el)\b/i.test(message);
+		const quiereComprar = /\b(?:comprar(?:lo|la)?|lo quiero|la quiero|quiero esa|quiero este|quiero comprar|c[oó]mo (?:compro|hago|puedo pagar|le hago|le hago para pagar|pago)|quiero pagar|proceder|concretar|compralo|c[oó]mpralo|reservar|apartar|d[áa]le|confirmo compra|ya lo quiero|me gusta esa|me gusta esta|me gusta ese|esa me gusta|esta me gusta|si continuemos|si sigamos|sigamos adelante|seguimos|continuemos)\b|\bcompr(?:o|ar)\s+(?:esa|este|ese)\b|\b(?:el de \d+|el primero|el segundo|me quedo con|me interesa el|prefiero el)\b/i.test(message);
 
 		if (quiereComprar && context?.modalidad === 'contado') {
 			const tieneCobertura = context?.tieneCobertura;
@@ -1489,16 +1489,17 @@ export class VentasAgent implements IAgent {
 		if (context?.flujo === 'pago_web_paso') {
 			const pasoActual = context?.pasoWeb ?? 1;
 			const pasos = [
-				'Añade el producto al carrito de compras.',
-				'Ve al carrito o presiona directamente el botón "Comprar".',
-				'Rellena todos tus datos de envío y pago.',
-				'Realiza el pago a través de Wompi y listo, ¡ya quedó!',
+				'Abre el enlace del producto y dale clic en "Añadir al carrito" o "Comprar".',
+				'En el carrito, selecciona tu departamento y dale "Actualizar". Ahí te aparecen los municipios y ciudades.',
+				'Selecciona tu municipio, pon el código postal y dale "Actualizar" de nuevo. Ahí se calcula el flete y confirmas si tienes envío gratis.',
+				'Revisa que todo esté bien y dale "Proceder al pago". Rellena tus datos personales.',
+				'Elige tu método de pago en Wompi (PSE, tarjeta, Nequi) y confirma. ¡Listo, ya quedó! 🎉',
 			];
 			if (pasoActual <= pasos.length) {
-				const pasoMsg = `Paso ${pasoActual}: ${pasos[pasoActual - 1]}`;
+				const pasoMsg = `Paso ${pasoActual} de ${pasos.length}: ${pasos[pasoActual - 1]}`;
 				const siguiente = pasoActual < pasos.length
-					? '\n\nCuando termines, dime "listo" para continuar con el siguiente paso.'
-					: '\n\n¿Lograste completar el pago?';
+					? '\n\nDime "listo" cuando termines o "ayuda" si tienes algún problema. 😊'
+					: '\n\n¿Lograste completar el pago? Si tuviste algún inconveniente, cuéntame y te ayudo.';
 				return {
 					response: pasoMsg + siguiente,
 					metadata: {
@@ -1507,9 +1508,46 @@ export class VentasAgent implements IAgent {
 						pasoWeb: pasoActual + 1,
 						ciudad: context?.ciudad,
 						ciudadValidada: true,
+						productoURL: context?.productoURL,
 					},
 				};
 			}
+		}
+
+		// ── Manejo de pago completado o fallido ───────────────────────────────
+		if (context?.flujo === 'pago_completado') {
+			const noPudo = /no\s*(?:pude|puedo|logr[eé]|me\s*dej[oó])|problema|error|fallo|fall[oó]|no\s*sirv[eió]/i.test(lower);
+			if (noPudo) {
+				// Escalar a humano: notificar internamente
+				const ciudadCap = context?.ciudad ? context.ciudad.charAt(0).toUpperCase() + context.ciudad.slice(1) : '';
+				const productoInfo = context?.productoURL || 'producto pendiente';
+				const notificacion = `⚠️ Cliente desde ${ciudadCap} no pudo completar el pago web.\nProducto: ${productoInfo}\nRequiere asistencia.`;
+				try {
+					const WA_ESCALAMIENTO = process.env.WA_ESCALAMIENTO || '573187408190';
+					await sendWA(WA_ESCALAMIENTO, notificacion);
+				} catch { /* no bloquear */ }
+
+				return {
+					response: `No te preocupes, ya le notifiqué a nuestro equipo comercial para que te ayude directamente. Un asesor te va a escribir por aquí en un momentico. 💪`,
+					metadata: {
+						agentType: 'ventas',
+						flujo: null,
+						ciudad: context?.ciudad,
+						ciudadValidada: true,
+						escalado: true,
+					},
+				};
+			}
+			// Si dice que sí pudo → pedir comprobante
+			return {
+				response: `¡Qué bien! 🎉 Para confirmar tu pago, compárteme el comprobante o número de transacción por aquí (foto o pantallazo). Nuestro equipo lo verifica y te programamos el envío lo antes posible.`,
+				metadata: {
+					agentType: 'ventas',
+					flujo: 'esperando_comprobante',
+					ciudad: context?.ciudad,
+					ciudadValidada: true,
+				},
+			};
 		}
 
 		if (context?.flujo === 'pago_web') {
@@ -1589,12 +1627,13 @@ export class VentasAgent implements IAgent {
 			}
 			if (context?.tieneCobertura && /3|punto físico|físico|tienda/i.test(opcion)) {
 				return {
-					response: `Con gusto te reservamos el producto.\nPor favor compárteme tu nombre completo y número de cédula.`,
+					response: `¡Claro! Para reservarte el producto en el punto más cercano, necesito tu nombre completo y número de cédula. 😊`,
 					metadata: {
 						agentType: 'ventas',
 						flujo: 'pago_fisico',
 						ciudad: context?.ciudad,
 						ciudadValidada: true,
+						notificarPuntoFisico: true,
 					},
 				};
 			}
@@ -1741,8 +1780,9 @@ export class VentasAgent implements IAgent {
 			? 'tienes envío gratis'
 			: 'pago de contado (flete por Coordinadora a cargo del cliente)';
 
-		// Detectar si pide más opciones
+		// Detectar si pide más opciones O más económicas/baratas de la misma categoría
 		const pideMas = /(?:tienes\s*mas|hay\s*m[áa]s|m[áa]s\s*opciones|otr[oa]s?\s*opciones|quiero\s*ver\s*m[áa]s|mu[ée]strame\s*m[áa]s|busco\s*otr[oa]|alg[úu]n\s*otr[oa]|otr[oa]s?\s*opciones|diferente)/i.test(message);
+		const pideMasEconomico = /(?:m[áa]s\s*(?:econ[oó]mic[oa]s?|barat[oa]s?|econ[oó]mic[oa])|algo\s*(?:m[áa]s\s*)?(?:econ[oó]mico|barato)|m[áa]s\s*barato|menos\s*costoso|de\s*menor\s*precio|hay\s*(?:algo\s*)?m[áa]s\s*barat)/i.test(message);
 
 		let products: any[] = [];
 		let hayProductos = false;
@@ -1782,19 +1822,47 @@ export class VentasAgent implements IAgent {
 			};
 		}
 
-		if (pideMas) {
+		if (pideMas || pideMasEconomico) {
 			const busquedaGuardada = context?.ultimaBusqueda;
 			if (busquedaGuardada?.results?.length > 0) {
 				products = busquedaGuardada.results;
-				productoIndex = (busquedaGuardada.productoIndex ?? 0) + 1;
-				if (productoIndex >= products.length) {
-					// Se agotaron los productos guardados → re-consultar WooCommerce
-					const terminoReSearch = busquedaGuardada.categoria || context?.terminoBusqueda || '';
-					if (terminoReSearch) {
-						products = [];
-						terminoBusqueda = terminoReSearch;
-					} else {
-						productoIndex = products.length;
+
+				if (pideMasEconomico) {
+					// Ordenar por precio ascendente y mostrar los más baratos que aún no se mostraron
+					products = [...products].sort((a: any, b: any) => {
+						const pa = parseFloat(a.price || '999999999');
+						const pb = parseFloat(b.price || '999999999');
+						return pa - pb;
+					});
+					productoIndex = 0; // Empezar desde el más barato
+					
+					// También re-buscar en WooCommerce con término + "economica" para ampliar resultados
+					const catBusqueda = busquedaGuardada.categoria || context?.terminoBusqueda || '';
+					if (catBusqueda) {
+						try {
+							const masProductos = await wooCommerceService.searchProducts(catBusqueda, 20);
+							if (masProductos?.length > 0) {
+								// Combinar sin duplicados, ordenar por precio
+								const idsExistentes = new Set(products.map((p: any) => p.id));
+								const nuevos = masProductos.filter((p: any) => !idsExistentes.has(p.id));
+								products = [...products, ...nuevos].sort((a: any, b: any) => {
+									const pa = parseFloat(a.price || '999999999');
+									const pb = parseFloat(b.price || '999999999');
+									return pa - pb;
+								});
+							}
+						} catch { /* continuar con lo que tenemos */ }
+					}
+				} else {
+					productoIndex = (busquedaGuardada.productoIndex ?? 0) + 1;
+					if (productoIndex >= products.length) {
+						const terminoReSearch = busquedaGuardada.categoria || context?.terminoBusqueda || '';
+						if (terminoReSearch) {
+							products = [];
+							terminoBusqueda = terminoReSearch;
+						} else {
+							productoIndex = products.length;
+						}
 					}
 				}
 			} else {
@@ -1838,11 +1906,11 @@ export class VentasAgent implements IAgent {
 				}
 
 				// Si el usuario preguntó específicamente por un producto que no está en categorías
-				// y no se encontró nada, no hacemos fallback a productos generales
-				if ((!products || products.length === 0) && esConsultaProducto && !mencionaAlgunaCategoria) {
-					const nombreProducto = busquedaMatch?.[1]?.trim().toLowerCase() || 'ese producto';
+				// y no se encontró nada, informar honestamente SIN recomendar otros productos
+				if ((!products || products.length === 0) && esConsultaProducto) {
+					const nombreProducto = busquedaMatch?.[1]?.trim().toLowerCase() || terminoBusqueda.toLowerCase();
 					return {
-						response: `Lo siento, no tenemos ${nombreProducto} en nuestro catálogo actualmente. ¿Te puedo ayudar con otro producto? 🛒`,
+						response: `En este momento no tenemos ${nombreProducto} disponible en nuestro catálogo. ¿Hay algo más en lo que te pueda ayudar? 😊`,
 						nextStage: 'PROPOSAL',
 						metadata: {
 							agentType: 'ventas',
@@ -1896,7 +1964,11 @@ REGLAS:
 - Si el cliente ya dio datos (nombre, cédula, ciudad, presupuesto), úsalos sin pedirlos de nuevo.
 - Si el cliente pide un producto NUEVO o diferente al anterior, ayúdale con eso. No insistas con el producto anterior.
 - PROHIBIDO confirmar envío o despacho si el cliente no ha pagado. Di "tan pronto se confirme el pago".
-- Si el cliente dice que ya pagó, pide el comprobante o número de transacción.`,
+- Si el cliente dice que ya pagó, pide el comprobante o número de transacción.
+- NUNCA compartas números de WhatsApp de cartera, correos de facturación ni números de soporte de pago. Esos datos son exclusivos del área de cartera.
+- NUNCA digas "generé tu orden de compra" ni "tu orden quedó lista". Di que el producto queda reservado pendiente a su pago.
+- Si NO encontraste el producto exacto que busca, NO le recomiendes productos de otra categoría. Solo dile que no lo tenemos disponible y pregunta si busca algo más.
+- NUNCA recomiendes productos que el cliente NO pidió (ej: si busca cafetera, NO ofrezcas arrocera ni licuadora).`,
 			ejemplos: [
 				{
 					cliente: 'Busco una nevera',

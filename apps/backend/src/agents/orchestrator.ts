@@ -65,7 +65,6 @@ export class Orchestrator {
 		if (m.length === 0) return true;
 
 		// Lista de saludos / aperturas comunes (sin intención específica)
-		// NOTA: "1"-"7" NO están aquí — son opciones de menú manejadas por menuOptionToIntent
 		const greetings = [
 			'hola', 'holaa', 'holaaa', 'holi', 'oli', 'ola', 'hello', 'hi', 'hey',
 			'buenas', 'buenos dias', 'buenos días', 'buen dia', 'buen día',
@@ -77,7 +76,6 @@ export class Orchestrator {
 			'pregunta', 'consulta', 'quisiera saber', 'me gustaría saber',
 			'soy nuevo', 'soy nueva', 'primera vez', 'vengo de',
 			'quiero informacion', 'quiero información', 'necesito ayuda',
-			'?', '??', '...',
 		];
 
 		// Limpiar puntuación final para comparar
@@ -270,7 +268,7 @@ Categoría:`;
 
 		if (flujoActivo) {
 			// Mapear flujo activo al agente correspondiente
-			if (/^credito/.test(flujoActivo) || flujoActivo === 'sin_cobertura' || flujoActivo === 'contado_sin_cobertura' || flujoActivo === 'esperando_ciudad' || flujoActivo === 'credito_perfilando' || flujoActivo === 'esperando_modalidad' || flujoActivo === 'perfilando_producto' || flujoActivo === 'perfilando_presupuesto' || flujoActivo === 'perfilando' || flujoActivo === 'seleccion_pago' || flujoActivo === 'pago_web' || flujoActivo === 'pago_web_paso' || flujoActivo === 'pago_medios' || flujoActivo === 'pago_fisico') {
+			if (/^credito/.test(flujoActivo) || flujoActivo === 'sin_cobertura' || flujoActivo === 'contado_sin_cobertura' || flujoActivo === 'esperando_ciudad' || flujoActivo === 'credito_perfilando' || flujoActivo === 'esperando_modalidad' || flujoActivo === 'perfilando_producto' || flujoActivo === 'perfilando_presupuesto' || flujoActivo === 'perfilando' || flujoActivo === 'seleccion_pago' || flujoActivo === 'seleccion_pago_ambiguo' || flujoActivo === 'pago_web' || flujoActivo === 'pago_web_paso' || flujoActivo === 'pago_medios' || flujoActivo === 'pago_fisico' || flujoActivo === 'pago_completado' || flujoActivo === 'esperando_comprobante' || flujoActivo === 'credito_pausado' || flujoActivo === 'pago_pausado' || flujoActivo === 'perfilando_pausado') {
 				intent = 'ventas';
 			} else if (/^repuesto/.test(flujoActivo)) {
 				intent = 'repuestos';
