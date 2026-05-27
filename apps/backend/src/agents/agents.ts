@@ -1740,7 +1740,36 @@ export class VentasAgent implements IAgent {
 		if ((categoriaGeneral || catDetectada) && context?.flujo !== 'perfilando') {
 			const cat = catDetectada;
 			if (cat) {
-				// Detectar si el usuario ya dio información espontánea (shortcuts)
+				// ── BUSCAR PRIMERO EN WOOCOMMERCE antes de perfilar ──────────
+				// Si el producto no existe en el catálogo, no tiene sentido
+				// preguntar presupuesto. Primero verificamos disponibilidad.
+				const terminoParaBuscar = message.toLowerCase().replace(/(?:busco|quiero|necesito|tiene[ns]?|hay|venden|muestra|quisiera|me interesa)\s*/gi, '').trim();
+				let productosDisponibles: any[] = [];
+				try {
+					productosDisponibles = await wooCommerceService.searchProducts(terminoParaBuscar, 20);
+					// Si no encontró con el mensaje completo, intentar solo con la categoría
+					if (productosDisponibles.length === 0) {
+						productosDisponibles = await wooCommerceService.searchProducts(cat, 20);
+					}
+				} catch { /* continuar sin productos */ }
+
+				// Si NO hay productos en WooCommerce → decirlo de una vez, sin perfilar
+				if (productosDisponibles.length === 0) {
+					return {
+						response: `En este momento no tenemos ${terminoParaBuscar} disponible en nuestro catálogo. ¿Hay algo más en lo que te pueda ayudar? 😊`,
+						nextStage: 'PROPOSAL',
+						metadata: {
+							agentType: 'ventas',
+							ciudadValidada: context?.ciudadValidada,
+							ciudad: context?.ciudad,
+							modalidad: context?.modalidad,
+							tieneCobertura: context?.tieneCobertura,
+							...datosPersonales,
+						},
+					};
+				}
+
+				// SÍ hay productos → ahora sí decidir si perfilar o ir directo
 				const shortcuts = detectarShortcuts(message, cat);
 				const pasos = PROFILING_STEPS[cat] || PROFILING_STEPS.otra;
 				const campos = camposPerfilCompletados(shortcuts);
@@ -1753,7 +1782,6 @@ export class VentasAgent implements IAgent {
 					// Iniciar perfilamiento: encontrar el primer campo sin responder
 					const primerPaso = pasos.find(p => !shortcuts[p.field]);
 					if (primerPaso) {
-						// Guardar el término original por si el usuario preguntó por un producto específico
 						const prodMatch = message.match(/(?:busco|quiero|necesito|tiene[ns]?|hay|venden|muestra|muestrame|quisiera|me interesa|info de|informacion de)\s*(?:un[oa]?|unas?|disponible)?\s*([a-záéíóúñÁÉÍÓÚÑ][a-záéíóúñÁÉÍÓÚÑ\s]{2,40})/i);
 						return {
 							response: primerPaso.pregunta,
@@ -1765,6 +1793,8 @@ export class VentasAgent implements IAgent {
 								ciudadValidada: true,
 								tieneCobertura: context?.tieneCobertura,
 								modalidad: context?.modalidad,
+								// Guardar los productos ya encontrados para no re-buscar
+								productosPreCargados: productosDisponibles,
 								...datosPersonales,
 							},
 						};
@@ -1879,8 +1909,13 @@ export class VentasAgent implements IAgent {
 		if (products.length === 0) {
 			const esConsultaProducto = /(?:tiene[ns]?|hay|venden|busco|quiero|necesito|me interesa|consulta|precio|cu[aá]nto)/i.test(message);
 
-			try {
-				// WooCommerce search
+			// Usar productos pre-cargados del perfilamiento si existen
+			if (context?.productosPreCargados?.length > 0) {
+				products = context.productosPreCargados;
+				hayProductos = true;
+			} else {
+				try {
+					// WooCommerce search
 				if (!products || products.length === 0) {
 					products = await wooCommerceService.searchProducts(terminoBusqueda, 20);
 				}
@@ -1920,14 +1955,26 @@ export class VentasAgent implements IAgent {
 				}
 
 				if (!products || products.length === 0) {
-					const generalProducts = await wooCommerceService.getProducts(10);
-					products = generalProducts.filter((p) => p.name && p.permalink);
+					// No hacer fallback a productos aleatorios — preguntar qué busca
+					return {
+						response: `Cuéntame, ¿qué producto te gustaría ver? Tenemos neveras, lavadoras, televisores, congeladores, parlantes, y más. 😊`,
+						nextStage: 'PROPOSAL',
+						metadata: {
+							agentType: 'ventas',
+							ciudadValidada: context?.ciudadValidada,
+							ciudad: context?.ciudad,
+							modalidad: context?.modalidad,
+							tieneCobertura: context?.tieneCobertura,
+							...datosPersonales,
+						},
+					};
 				}
 
 				hayProductos = products?.length > 0;
 			} catch {
 				// products se queda como []
 			}
+			} // close else (no productosPreCargados)
 		}
 
 		// Formatear productos para el prompt de la IA
@@ -2337,48 +2384,93 @@ export class DistribuidoresAgent implements IAgent {
 
 // ─── AGENTE MEDIOS DE PAGO ───────────────────────────────────────────────────
 //
-// Mejora #11: entregar automáticamente convenios, cuentas bancarias,
-// medios de recaudo y líneas para envío de soportes.
+// Si el cliente llega a este agente CON un producto seleccionado (desde ventas),
+// mostrar las opciones de pago con el link del producto y la imagen de medios.
+// Si llega SIN producto (pregunta genérica), dar info general.
 
 export class PagosAgent implements IAgent {
 	name = 'Medios de Pago';
 
 	async handle(message: string, context: any): Promise<AgentResponse> {
-		const userDataCtx = buildUserDataContext(context?.userData);
-		const datos = `Medios de pago JLC Electronics:${userDataCtx}
-1) En línea en https://jlc-electronics.com/ con PSE, tarjeta de crédito o débito.
-2) En punto físico (el asesor indica la tienda más cercana según ciudad).
-3) Crédito / cuotas: gestionado por Cristina al WhatsApp +57 318 740 8190.
-4) Para envío de soportes de pago: WhatsApp cartera +57 314 422 9949 o +57 315 721 2367.
-5) Correo para soporte de pago y facturación: callcenter5@electromillonaria.co.`;
+		// ── Detectar si hay un producto activo en el contexto ──────────────
+		const ultimosProductos = context?.ultimaBusqueda?.results ?? [];
+		const productoURL = context?.productoURL ?? ultimosProductos[0]?.permalink;
+		const productoNombre = context?.productoCompra ?? ultimosProductos[0]?.name;
+		const tieneCobertura = context?.tieneCobertura ?? false;
+		const ciudadStr = context?.ciudad
+			? context.ciudad.charAt(0).toUpperCase() + context.ciudad.slice(1)
+			: '';
 
+		// ── Si hay producto seleccionado → flujo de pago estructurado ─────
+		if (productoURL || productoNombre) {
+			const linkProducto = productoURL ? `\nLink de tu producto: ${productoURL}` : '';
+			const opcionPuntoFisico = tieneCobertura
+				? '\n3️⃣ Pagar en un punto físico (solo necesito tu nombre y cédula para reservarlo)'
+				: '';
+			const envioInfo = tieneCobertura
+				? `con envío gratis a ${ciudadStr}`
+				: ciudadStr ? `(envío por Coordinadora a ${ciudadStr})` : '';
+
+			return {
+				response: `Para pagar tu *${productoNombre || 'producto'}* ${envioInfo}, estas son tus opciones:${linkProducto}\n\n1️⃣ Por transferencia bancaria (medios autorizados)\nhttps://jlc-electronics.com/wp-content/uploads/2026/05/Medios_de_pago.jpeg\n\n2️⃣ Pagar directamente en la página web (PSE, Tarjeta, Nequi)${opcionPuntoFisico}\n\nEscríbeme el número de tu opción y te acompaño paso a paso. 😊`,
+				metadata: {
+					agentType: 'ventas', // Redirigir al agente de ventas para manejar el flujo
+					flujo: 'seleccion_pago',
+					modalidad: 'contado',
+					ciudad: context?.ciudad,
+					ciudadValidada: true,
+					tieneCobertura,
+					productoURL,
+					productoCompra: productoNombre,
+					ultimaBusqueda: context?.ultimaBusqueda,
+				},
+			};
+		}
+
+		// ── Sin producto → flujo genérico de medios de pago ───────────────
+		const lower = message.toLowerCase();
+
+		// Pregunta sobre soportes de pago
+		if (/soporte|comprobante|donde\s*env[ií]o|a\s*d[oó]nde\s*mando/i.test(lower)) {
+			return {
+				response: `Envía tu soporte de pago al WhatsApp de cartera: +57 314 422 9949 o +57 315 721 2367, o al correo callcenter5@electromillonaria.co. 😊`,
+				metadata: { agentType: 'pagos' },
+			};
+		}
+
+		// Pregunta sobre crédito
+		if (/cr[eé]dito|cuotas|financiar|financiaci[oó]n/i.test(lower)) {
+			return {
+				response: `El crédito lo gestiona nuestro equipo comercial. ¿Quieres que te ayude a iniciar la solicitud de crédito desde aquí?`,
+				metadata: { agentType: 'pagos' },
+			};
+		}
+
+		// Pregunta genérica de medios de pago
+		const userDataCtx = buildUserDataContext(context?.userData);
 		const { system, user } = buildGemmaPrompt({
-			instruccion: `Eres asistente de medios de pago de Electrodomésticos JLC. Entrega SIEMPRE la información concreta de cómo pagar según lo que pide el cliente. No digas "un asesor te contactará"; da los datos directamente. Datos: ${datos}`,
+			instruccion: `Eres Sara, asesora de medios de pago de JLC Electronics. Tono cálido y femenino. Español colombiano.
+Entrega la información concreta de cómo pagar. No digas "un asesor te contactará".
+${userDataCtx}
+Medios de pago:
+1) En línea en https://jlc-electronics.com/ con PSE, tarjeta de crédito o débito.
+2) En punto físico (según disponibilidad en la ciudad del cliente).
+3) Crédito/cuotas: se gestiona desde el chat (iniciar solicitud de crédito).
+4) Imagen de medios autorizados: https://jlc-electronics.com/wp-content/uploads/2026/05/Medios_de_pago.jpeg
+REGLAS:
+- Si el cliente pregunta cómo pagar, muestra la imagen de medios de pago.
+- Mensajes cortos tipo WhatsApp, sin asteriscos.
+- No menciones números de cartera a menos que pregunten por soportes de pago.`,
 			ejemplos: [
 				{
 					cliente: '¿Cómo puedo pagar?',
 					asistente:
-						'Tienes dos opciones rápidas: 1) En línea en https://jlc-electronics.com/ con PSE, tarjeta de crédito o débito. 2) En punto físico. ¿Cuál prefieres o desde qué ciudad escribes?',
+						'Aquí están nuestros medios de pago autorizados:\nhttps://jlc-electronics.com/wp-content/uploads/2026/05/Medios_de_pago.jpeg\n\nTambién puedes pagar en línea en https://jlc-electronics.com/ con PSE, tarjeta o Nequi. ¿Ya tienes un producto seleccionado?',
 				},
 				{
 					cliente: '¿Aceptan tarjeta de crédito?',
 					asistente:
-						'¡Sí! Al pagar en https://jlc-electronics.com/ puedes usar tarjeta de crédito, débito o PSE. ¿Ya tienes el producto seleccionado?',
-				},
-				{
-					cliente: 'Quiero pagar a crédito',
-					asistente:
-						'El crédito lo gestiona Cristina. Escríbele al WhatsApp +57 318 740 8190 con el producto que te interesa y ella te guía paso a paso.',
-				},
-				{
-					cliente: '¿A dónde mando el soporte de pago?',
-					asistente:
-						'Envía tu soporte de pago al WhatsApp de cartera: +57 314 422 9949 o +57 315 721 2367, o al correo callcenter5@electromillonaria.co.',
-				},
-				{
-					cliente: '¿Tienen convenio con Efecty o Baloto?',
-					asistente:
-						'En este momento los medios habilitados son PSE, tarjeta de crédito/débito en línea y pago en punto físico. Para confirmar convenios adicionales, consulta directamente en https://jlc-electronics.com/ o escribe a Cristina al +57 318 740 8190.',
+						'Sí, al pagar en https://jlc-electronics.com/ puedes usar tarjeta de crédito, débito o PSE a través de Wompi. ¿Te ayudo a seleccionar un producto?',
 				},
 			],
 			historial: formatHistory(context?.history),

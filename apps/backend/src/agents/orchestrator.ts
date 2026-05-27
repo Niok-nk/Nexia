@@ -278,6 +278,13 @@ Categoría:`;
 			}
 		} else {
 			intent = await this.classifyIntent(message, hasHistory);
+
+			// ── CORRECCIÓN: Si el intent es 'pagos' pero hay un producto activo
+			// en el contexto de ventas, mantener en ventas para que el flujo de
+			// pago integrado maneje la transacción (no el agente genérico de pagos).
+			if (intent === 'pagos' && context?.ultimaBusqueda?.results?.length > 0 && context?.modalidad === 'contado') {
+				intent = 'ventas';
+			}
 		}
 
 		const agent = this.agents[intent] || this.agents.ventas;
