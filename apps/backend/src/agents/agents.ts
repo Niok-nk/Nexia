@@ -1689,9 +1689,8 @@ export class VentasAgent implements IAgent {
 
 			// Todos los pasos del perfil completados → recomendar productos
 			if (camposOk >= pasos.length || perfilState.step > pasos.length) {
-				const terminoBusqueda = obtenerTerminoBusquedaDesdePerfil(perfilState.categoria, perfilState.answers);
-				// Continuar al flujo de ventas normal con término de búsqueda derivado del perfil
-				// (colocamos terminoBusqueda en el contexto para que el flujo normal lo use)
+				// Priorizar el producto específico que mencionó antes del perfilamiento
+				const terminoBusqueda = (perfilState as any).terminoOriginal || obtenerTerminoBusquedaDesdePerfil(perfilState.categoria, perfilState.answers);
 				context = { ...context, flujo: null, terminoBusqueda };
 				if (perfilState.answers.presupuesto) {
 					datosPersonales.presupuesto = perfilState.answers.presupuesto;
@@ -1754,12 +1753,14 @@ export class VentasAgent implements IAgent {
 					// Iniciar perfilamiento: encontrar el primer campo sin responder
 					const primerPaso = pasos.find(p => !shortcuts[p.field]);
 					if (primerPaso) {
+						// Guardar el término original por si el usuario preguntó por un producto específico
+						const prodMatch = message.match(/(?:busco|quiero|necesito|tiene[ns]?|hay|venden|muestra|muestrame|quisiera|me interesa|info de|informacion de)\s*(?:un[oa]?|unas?|disponible)?\s*([a-záéíóúñÁÉÍÓÚÑ][a-záéíóúñÁÉÍÓÚÑ\s]{2,40})/i);
 						return {
 							response: primerPaso.pregunta,
 							metadata: {
 								agentType: 'ventas',
 								flujo: 'perfilando',
-								perfilState: { categoria: cat, step: pasos.indexOf(primerPaso) + 1, answers: shortcuts },
+								perfilState: { categoria: cat, step: pasos.indexOf(primerPaso) + 1, answers: shortcuts, terminoOriginal: prodMatch ? prodMatch[1].trim().toLowerCase() : null },
 								ciudad: context?.ciudad,
 								ciudadValidada: true,
 								tieneCobertura: context?.tieneCobertura,
