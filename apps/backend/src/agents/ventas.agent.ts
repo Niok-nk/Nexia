@@ -112,7 +112,24 @@ function matchProductoDesdeMsg(msg: string, productos: any[]): any | null {
 	if (!productos || productos.length === 0) return null;
 	const lowerMsg = msg.toLowerCase().trim();
 
-	// 1. Ordinal explícito (masculino y femenino)
+	// 1. Número de specs presente en el mensaje que aparece en el nombre del producto
+	//    Ej: "900" matchea "Licuadora 900W". Es la señal más fuerte si el usuario es específico.
+	const numbersInMsg = lowerMsg.match(/\b\d{2,}\b/g);
+	if (numbersInMsg && numbersInMsg.length > 0) {
+		const candidates = productos.filter((p: any) =>
+			numbersInMsg.some((num: string) => p.name.toLowerCase().includes(num))
+		);
+		if (candidates.length >= 1) return candidates[0];
+	}
+
+	// 2. Nombre parcial: el mensaje incluye parte del nombre del producto o viceversa
+	const byName = productos.find((p: any) => {
+		const nameLower = p.name.toLowerCase();
+		return nameLower.includes(lowerMsg) || lowerMsg.includes(nameLower.slice(0, 20));
+	});
+	if (byName) return byName;
+
+	// 3. Ordinal explícito (masculino y femenino)
 	const ORDINALS: Array<[RegExp, number]> = [
 		[/\b(?:primer[oa]|primera\s+opci[oó]n|el\s+primero|la\s+primera|uno|1[aº]?)\b/, 0],
 		[/\b(?:segund[oa]|segunda\s+opci[oó]n|el\s+segundo|la\s+segunda|dos|2[aº]?)\b/, 1],
@@ -126,27 +143,10 @@ function matchProductoDesdeMsg(msg: string, productos: any[]): any | null {
 		}
 	}
 
-	// 2. Índice numérico corto ("1", "2", "3" — máx 2 caracteres para no confundir con specs)
+	// 4. Índice numérico corto ("1", "2", "3" — máx 2 caracteres para no confundir con specs)
 	const shortNum = parseInt(lowerMsg, 10);
 	if (!isNaN(shortNum) && lowerMsg.length <= 2 && shortNum >= 1 && shortNum <= productos.length) {
 		return productos[shortNum - 1];
-	}
-
-	// 3. Nombre parcial: el mensaje incluye parte del nombre del producto o viceversa
-	const byName = productos.find((p: any) => {
-		const nameLower = p.name.toLowerCase();
-		return nameLower.includes(lowerMsg) || lowerMsg.includes(nameLower.slice(0, 20));
-	});
-	if (byName) return byName;
-
-	// 4. Número de specs presente en el mensaje que aparece en el nombre del producto
-	//    Ej: "55" matchea "Televisor JLC 55 pulgadas"
-	const numbersInMsg = lowerMsg.match(/\b\d{2,}\b/g);
-	if (numbersInMsg && numbersInMsg.length > 0) {
-		const candidates = productos.filter((p: any) =>
-			numbersInMsg.some((num: string) => p.name.toLowerCase().includes(num))
-		);
-		if (candidates.length >= 1) return candidates[0];
 	}
 
 	return null;
