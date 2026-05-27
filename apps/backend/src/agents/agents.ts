@@ -70,51 +70,37 @@ interface ProfilingStep {
 
 const PROFILING_STEPS: Record<string, ProfilingStep[]> = {
 	lavadora: [
-		{ field: 'tipo', pregunta: '¿La prefieres automática o semiautomática? 🧺\n\n🔵 Automática\n🟢 Semiautomática\n🤷 No estoy seguro' },
-		{ field: 'presupuesto', pregunta: '¿Tienes en mente algún presupuesto aproximado para la lavadora, o prefieres ver todas las opciones disponibles? 💰' },
+		{ field: 'presupuesto', pregunta: '¿Tienes un presupuesto en mente para la lavadora? Así te muestro las que más te gusten 💕' },
 	],
 	televisor: [
-		{ field: 'espacio', pregunta: '¿Para qué espacio es? 📺\n\n1️⃣ Sala\n2️⃣ Habitación\n3️⃣ Cocina o negocio' },
-		{ field: 'tamano', pregunta: '¿Qué tamaño buscas? 📏\n\n1️⃣ 32" a 43"\n2️⃣ 50" a 55"\n3️⃣ 65" o más\n4️⃣ No estoy seguro' },
-		{ field: 'smart', pregunta: '¿Necesitas Smart TV con apps? 🌐\n\n1️⃣ Sí\n2️⃣ No importa' },
-		{ field: 'presupuesto', pregunta: '¿Tienes en mente algún presupuesto aproximado para el televisor, o prefieres ver todas las opciones disponibles? 💰' },
+		{ field: 'presupuesto', pregunta: 'Cuéntame, ¿cuánto pensabas invertir en tu nuevo televisor? Así te recomiendo los mejores 📺✨' },
 	],
 	nevera: [
-		{ field: 'presupuesto', pregunta: '¿Tienes algún presupuesto en mente para la nevera, o prefieres ver todas las opciones disponibles? 💰' },
+		{ field: 'presupuesto', pregunta: '¿Qué presupuesto tienes para tu nevera? Para mostrarte las opciones que más te encanten 💙' },
 	],
 	audio: [
-		{ field: 'uso_audio', pregunta: '¿Para qué uso? 🎵\n\n1️⃣ Fiestas y eventos\n2️⃣ Sonido ambiental\n3️⃣ Karaoke o DJ\n4️⃣ Uso portátil' },
-		{ field: 'presupuesto', pregunta: '¿Tienes algún presupuesto aproximado para el parlante, o prefieres ver todas las opciones disponibles? 💰' },
+		{ field: 'presupuesto', pregunta: '¿Cuánto quieres gastar en tu equipo de sonido? Así te traigo las mejores opciones 🎵😊' },
 	],
 	cocina: [
-		{ field: 'personas', pregunta: '¿Para cuántas personas en tu hogar? 👨‍👩‍👧‍👧\n\n1️⃣ 1 a 2\n2️⃣ 3 a 4\n3️⃣ 5 o más' },
-		{ field: 'presupuesto', pregunta: '¿Presupuesto aproximado? 💰\n\n1️⃣ Menos de $200.000\n2️⃣ $200.000 – $500.000\n3️⃣ Más de $500.000' },
+		{ field: 'presupuesto', pregunta: '¿Tienes un presupuesto pensado para lo que buscas? Así te ayudo a encontrar justo lo que necesitas 👩‍🍳✨' },
 	],
 	ventilador: [
-		{ field: 'presupuesto', pregunta: '¿Presupuesto aproximado? 💰\n\n1️⃣ Menos de $150.000\n2️⃣ $150.000 – $300.000\n3️⃣ Más de $300.000' },
+		{ field: 'presupuesto', pregunta: '¿Qué presupuesto manejas para tu ventilador? Te muestro las opciones disponibles 🌬️💕' },
 	],
 	congelador: [
-		{ field: 'uso_negocio', pregunta: '¿Para hogar o negocio? ❄️\n\n1️⃣ Hogar\n2️⃣ Negocio / tienda' },
-		{ field: 'tamano', pregunta: '¿Tamaño? 📐\n\n1️⃣ Pequeño (menos de 300L)\n2️⃣ Mediano (300L – 500L)\n3️⃣ Grande (más de 500L)' },
-		{ field: 'presupuesto', pregunta: '¿Presupuesto aproximado? 💰\n\n1️⃣ Menos de $700.000\n2️⃣ $700.000 – $1.200.000\n3️⃣ Más de $1.200.000' },
+		{ field: 'presupuesto', pregunta: '¿Cuánto pensabas invertir en tu congelador? Así te enseño las alternativas que tenemos ❄️😊' },
 	],
 	vitrina: [
-		{ field: 'uso_negocio', pregunta: '¿Para hogar o negocio? 🏪\n\n1️⃣ Hogar\n2️⃣ Negocio / tienda' },
-		{ field: 'tamano', pregunta: '¿Tamaño? 📐\n\n1️⃣ Pequeña (menos de 300L)\n2️⃣ Mediana (300L – 500L)\n3️⃣ Grande (más de 500L)' },
-		{ field: 'presupuesto', pregunta: '¿Presupuesto aproximado? 💰\n\n1️⃣ Menos de $800.000\n2️⃣ $800.000 – $1.500.000\n3️⃣ Más de $1.500.000' },
+		{ field: 'presupuesto', pregunta: '¿Qué presupuesto tienes para tu vitrina? Te muestro las que tenemos disponibles 🏪✨' },
 	],
 	exhibidor: [
-		{ field: 'uso_negocio', pregunta: '¿Para hogar o negocio? 🏪\n\n1️⃣ Hogar\n2️⃣ Negocio / tienda' },
-		{ field: 'tamano', pregunta: '¿Tamaño? 📐\n\n1️⃣ Pequeño (menos de 200L)\n2️⃣ Grande (más de 200L)' },
-		{ field: 'presupuesto', pregunta: '¿Presupuesto aproximado? 💰\n\n1️⃣ Menos de $600.000\n2️⃣ $600.000 – $1.000.000\n3️⃣ Más de $1.000.000' },
+		{ field: 'presupuesto', pregunta: 'Cuéntame tu presupuesto para el exhibidor y te muestro opciones chéveres 🏪💕' },
 	],
 	minibar: [
-		{ field: 'uso_minibar', pregunta: '¿Para dónde es? 🧊\n\n1️⃣ Oficina\n2️⃣ Habitación\n3️⃣ Sala / bar' },
-		{ field: 'presupuesto', pregunta: '¿Presupuesto aproximado? 💰\n\n1️⃣ Menos de $500.000\n2️⃣ $500.000 – $800.000\n3️⃣ Más de $800.000' },
+		{ field: 'presupuesto', pregunta: '¿Tienes un presupuesto en mente para el minibar? Así te enseño los que más te gusten 🧊😊' },
 	],
 	otra: [
-		{ field: 'uso', pregunta: '¿Para qué lo vas a usar principalmente? 😊' },
-		{ field: 'presupuesto', pregunta: '¿Presupuesto aproximado? 💰' },
+		{ field: 'presupuesto', pregunta: '¿Qué presupuesto manejas? Así te ayudo a encontrar justo lo que buscas 💕' },
 	],
 };
 
