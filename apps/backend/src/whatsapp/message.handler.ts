@@ -130,6 +130,7 @@ export async function handleIncomingMessage(msg: WAMessage): Promise<void> {
 
 	try {
 		const { response, agentType } = await processIncomingMessage(phone, body, realPhone);
+		if (!response) return;
 
 		// 10. Enviar respuesta por WhatsApp (intentar aunque el status no sea 'connected')
 		//     Baileys puede recibir mensajes incluso cuando isReady = false
@@ -150,6 +151,7 @@ export async function processIncomingMessage(
 	body: string,
 	realPhone: string | null = null
 ): Promise<{ response: string; agentType: string; contactId?: string; leadId?: string }> {
+	try {
 	// 1. Upsert del contacto
 	const contact = await (prisma.contact as any).upsert({
 		where: { phone },
@@ -435,4 +437,8 @@ export async function processIncomingMessage(
 	}
 
 	return { response, agentType, contactId: contact.id, leadId: lead?.id };
+	} catch (error) {
+		logger.error({ error, phone, body: body.slice(0, 80) }, 'processIncomingMessage error');
+		return { response: '', agentType: 'SYSTEM' };
+	}
 }

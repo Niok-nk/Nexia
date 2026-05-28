@@ -121,8 +121,11 @@ router.post('/chat', async (req: Request, res: Response) => {
 
 	try {
 		const { response, agentType } = await processIncomingMessage(phone, message);
+		if (!response) {
+			res.status(500).json({ error: 'No se pudo procesar el mensaje' });
+			return;
+		}
 
-		// Usar realPhone del contacto para enviar (puede ser un LID)
 		const contact = await prisma.contact.findUnique({ where: { phone } }).catch(() => null);
 		const sendTo = contact?.realPhone || phone;
 
@@ -154,6 +157,10 @@ router.post('/test', requireAuth, async (req: Request, res: Response) => {
 
 	try {
 		const { response, agentType, contactId, leadId } = await processIncomingMessage(phone, message);
+		if (!response) {
+			res.status(500).json({ error: 'No se pudo procesar el mensaje' });
+			return;
+		}
 
 		// Usar realPhone del contacto para enviar
 		const contact = await prisma.contact.findUnique({ where: { phone } }).catch(() => null);
