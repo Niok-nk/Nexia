@@ -36,7 +36,7 @@ export class BienvenidaAgent implements IAgent {
 
 	async handle(_message: string, context: any): Promise<AgentResponse> {
 		const recurrente = this.esClienteRecurrente(context);
-		const nombre = context?.userData?.nombre || undefined;
+		const nombre = (context?.userData?.nombre || '').split(/\s+/)[0] || undefined;
 		const iaMsg = await generarBienvenidaIA(recurrente, nombre);
 		return {
 			response: iaMsg,
