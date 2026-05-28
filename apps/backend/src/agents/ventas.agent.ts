@@ -1125,6 +1125,19 @@ export class VentasAgent implements IAgent {
 			};
 		}
 
+		// ── Despedidas ───────────────────────────────────────────────────────
+		if (/^(?:chao|adi[oó]s|bye|nos vemos|hasta luego|hasta pronto|cuídese|cuídate|gracias.*(?:chao|adi[oó]s|bye)|ya me voy|me retiro|buenas noches|buen día|buena tarde|que tengas buen|que est[eé]s bien|fue un placer|un placer|nos hablamos|luego|despu[eé]s te escribo|quedo atenta|quedo atento|gracias por todo|muchas gracias.*(?:adi[oó]s|bye|chao)|me voy|chao gracias|adi[oó]s gracias)\s*$/i.test(message.trim().toLowerCase())) {
+			return {
+				response: `¡Hasta luego! ${context?.userData?.nombre ? `Fue un placer ayudarte, ${context.userData.nombre}. ` : ''}Cuando necesites algo más, aquí estaré. ¡Cuídate mucho! 😊`,
+				metadata: {
+					agentType: 'ventas',
+					flujo: null,
+					ciudadValidada: context?.ciudadValidada,
+					ciudad: context?.ciudad,
+				},
+			};
+		}
+
 		// ── Flujo normal de ventas (mostrar productos) ──────────────────────
 		const ciudadStr = context?.ciudad ? `En ${context.ciudad.charAt(0).toUpperCase() + context.ciudad.slice(1)}` : '';
 		const envioStr = context?.tieneCobertura
