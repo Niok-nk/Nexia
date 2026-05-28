@@ -142,30 +142,6 @@ export async function handleIncomingMessage(msg: WAMessage): Promise<void> {
 		}
 	} catch (error) {
 		logger.error({ error, phone }, 'Error handling incoming message');
-
-		// Intentar enviar mensaje de error al usuario
-		try {
-			const fallbackResponse = 'Lo siento, hubo un problema procesando tu mensaje. Por favor intenta de nuevo en un momento.';
-			await sendMessage(realPhone || phone, fallbackResponse);
-
-				// Intentar buscar el contacto y persistir la respuesta de error de fallback en BD
-			const contact = await prisma.contact.findUnique({
-				where: { phone },
-			});
-
-			if (contact) {
-				await prisma.message.create({
-					data: {
-						contactId: contact.id,
-						direction: 'OUTBOUND',
-						body: fallbackResponse,
-						agentType: 'SYSTEM',
-					},
-				});
-			}
-		} catch (err) {
-			logger.error({ err }, 'Failed to send or save fallback error message');
-		}
 	}
 }
 
