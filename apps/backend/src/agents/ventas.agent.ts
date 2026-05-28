@@ -162,6 +162,7 @@ export class VentasAgent implements IAgent {
 			...context?.creditoData,
 			...(context?.userData?.nombre ? { nombres: context.userData.nombre } : {}),
 			...(context?.userData?.cedula ? { cedula: context.userData.cedula } : {}),
+			...(context?.userData?.direccion ? { direccion: context.userData.direccion } : {}),
 			...(context?.userData?.departamento ? { departamento: context.userData.departamento } : {}),
 			...(context?.userData?.ciudad ? { ciudad: context.userData.ciudad } : {}),
 			...(context?.userData?.productoSolicitado ? { producto: context.userData.productoSolicitado } : {}),

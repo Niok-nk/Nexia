@@ -226,7 +226,7 @@ export async function processIncomingMessage(
 		? await prisma.userData.findUnique({ where: { leadId: lead.id } })
 		: null;
 
-	const userData = {
+	let userData = {
 		ciudad: userDataRecord?.ciudad ?? null,
 		departamento: userDataRecord?.departamento ?? null,
 		nombre: userDataRecord?.nombre ?? null,
@@ -237,6 +237,28 @@ export async function processIncomingMessage(
 		presupuesto: userDataRecord?.presupuesto ?? null,
 		extra: safeParseJson(userDataRecord?.extra),
 	};
+
+	// Si es nueva sesión, recuperar datos persistentes del lead anterior
+	if (!lead && esNuevaSesion) {
+		try {
+			const leadAnterior = await prisma.lead.findFirst({
+				where: { contactId: contact.id, id: { not: undefined } },
+				orderBy: { createdAt: 'desc' },
+				include: { userData: true },
+			});
+			if (leadAnterior?.userData) {
+				const udAnterior = leadAnterior.userData;
+				if (udAnterior.nombre && !userData.nombre) userData.nombre = udAnterior.nombre;
+				if (udAnterior.cedula && !userData.cedula) userData.cedula = udAnterior.cedula;
+				if (udAnterior.ciudad && !userData.ciudad) userData.ciudad = udAnterior.ciudad;
+				if (udAnterior.departamento && !userData.departamento) userData.departamento = udAnterior.departamento;
+				if (udAnterior.direccion && !userData.direccion) userData.direccion = udAnterior.direccion;
+				if (udAnterior.telefono && !userData.telefono) userData.telefono = udAnterior.telefono;
+			}
+		} catch (e) {
+			logger.warn({ error: e }, 'Error recovering previous UserData');
+		}
+	}
 
 	// Intentar extraer ciudad y departamento directamente del mensaje actual
 	const { ciudad: ciudadDelMensaje, departamento: deptoDelMensaje } = extraerUbicacion(body);
