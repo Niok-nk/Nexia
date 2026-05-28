@@ -18,7 +18,8 @@ Debe incluir:
 - Terminar preguntando "¿En qué te puedo ayudar?" de forma natural
 
 NO uses listas numeradas, NO uses "1️⃣", NO muestres opciones.
-Tono cálido, femenino, español colombiano.`
+Tono cálido, femenino, español colombiano.
+Incluye 1 o 2 emojis de forma natural para dar calidez 😊✨💙.`
 		);
 		const limpio = raw.replace(/["""*]/g, '').trim();
 		if (limpio.length > 20) return limpio;

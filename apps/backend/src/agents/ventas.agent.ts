@@ -327,7 +327,7 @@ export class VentasAgent implements IAgent {
 			if (quiereContinuar) {
 				context.flujo = 'esperando_ciudad';
 				return {
-					response: '¡Excelente! Sigamos. ¿Desde dónde nos escribes? 📍',
+					response: '¡Excelente! Sigamos. ¿Desde dónde nos escribes? 📍😊',
 					metadata: {
 						agentType: 'ventas',
 						flujo: 'esperando_ciudad',
@@ -337,7 +337,7 @@ export class VentasAgent implements IAgent {
 			} else {
 				context.flujo = null;
 				return {
-					response: 'Entendido, cancelamos la consulta. ¿En qué más te puedo ayudar hoy? 😊',
+					response: 'Entendido, cancelamos la consulta. ¿En qué más te puedo ayudar hoy? 😊✨',
 					metadata: { agentType: 'ventas', flujo: null },
 				};
 			}
@@ -348,7 +348,7 @@ export class VentasAgent implements IAgent {
 			if (quiereContinuar) {
 				context.flujo = 'esperando_modalidad';
 				return {
-					response: '¡Súper! Cuéntame, ¿la compra sería al *contado* o a *crédito*?',
+					response: '¡Súper! Cuéntame, ¿la compra sería al *contado* o a *crédito*? 💙',
 					metadata: {
 						agentType: 'ventas',
 						flujo: 'esperando_modalidad',
