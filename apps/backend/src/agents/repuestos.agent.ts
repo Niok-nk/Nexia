@@ -20,6 +20,11 @@ export class RepuestosAgent implements IAgent {
 			return this.handleDatosPersonales(message, lower, context, repuestoData);
 		}
 
+		// ── Step 3.5: Preguntar qué pieza/repuesto necesita ──
+		if (context?.flujo === 'repuestos_pieza') {
+			return this.handlePieza(message, context, repuestoData);
+		}
+
 		// ── Step 3: Confirmación de producto ──
 		if (context?.flujo === 'repuestos_confirmar') {
 			return this.handleConfirmacion(message, lower, context, repuestoData);
@@ -29,11 +34,8 @@ export class RepuestosAgent implements IAgent {
 		const tieneProducto = repuestoData.productoConfirmado || repuestoData.referenciaManual;
 
 		if (tieneProducto) {
-			// Tiene producto, pedir datos
-			return {
-				response: '¡Perfecto! Para registrar tu solicitud necesito tu nombre completo y número de cédula. 😊',
-				metadata: { agentType: 'repuestos', flujo: 'repuestos_datos', repuestoData },
-			};
+			// Tiene producto, preguntar qué pieza necesita
+			return this.pedirPieza(repuestoData);
 		}
 
 		// Primera vez: guardar lo que dijo y preguntar modelo
@@ -90,20 +92,14 @@ export class RepuestosAgent implements IAgent {
 		// Si estamos preguntando por ref manual y contesta sí
 		if (repuestoData.referenciaManual || !repuestoData.productoEncontrado) {
 			repuestoData.referenciaManual = repuestoData.referenciaManual || message.trim();
-			return {
-				response: '¡Perfecto! Para registrar tu solicitud necesito tu nombre completo y número de cédula. 😊',
-				metadata: { agentType: 'repuestos', flujo: 'repuestos_datos', repuestoData },
-			};
+			return this.pedirPieza(repuestoData);
 		}
 
 		const esAfirmativo = /^(s[íi]|si|ese es|correcto|ese mismo|esa es|sip|dale|ok|bueno|claro|sis[aa])$/i.test(lower);
 
 		if (esAfirmativo) {
 			repuestoData.productoConfirmado = true;
-			return {
-				response: '¡Perfecto! Para registrar tu solicitud necesito tu nombre completo y número de cédula. 😊',
-				metadata: { agentType: 'repuestos', flujo: 'repuestos_datos', repuestoData },
-			};
+			return this.pedirPieza(repuestoData);
 		}
 
 		// Negativo o ambiguo → pedir referencia manual
@@ -111,6 +107,23 @@ export class RepuestosAgent implements IAgent {
 		return {
 			response: 'No hay problema. ¿Puedes escribirme el nombre exacto o la referencia que aparece en la placa de tu equipo?',
 			metadata: { agentType: 'repuestos', flujo: 'repuestos_confirmar', repuestoData },
+		};
+	}
+
+	// ───────────────────────── Preguntar pieza ──────────────────────────────
+
+	private pedirPieza(repuestoData: any): AgentResponse {
+		return {
+			response: '¿Qué repuesto o pieza necesitas específicamente? (ej: empaque, filtro, resistencia, motor, etc.) 😊',
+			metadata: { agentType: 'repuestos', flujo: 'repuestos_pieza', repuestoData },
+		};
+	}
+
+	private async handlePieza(message: string, _context: any, repuestoData: any): Promise<AgentResponse> {
+		repuestoData.repuesto = message.trim();
+		return {
+			response: '¡Perfecto! Para registrar tu solicitud necesito tu nombre completo y número de cédula. 😊',
+			metadata: { agentType: 'repuestos', flujo: 'repuestos_datos', repuestoData },
 		};
 	}
 
