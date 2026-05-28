@@ -150,6 +150,25 @@ REGLAS:
 	return null;
 }
 
+async function generarMensajeSinCobertura(ciudad: string, mensajeUsuario: string): Promise<string> {
+	const ctx = mensajeUsuario
+		? `El usuario mencionó su ciudad (${ciudad}) y previamente dijo: "${mensajeUsuario}".`
+		: `El usuario dijo que es de ${ciudad}.`;
+	try {
+		return await generateResponse(
+			ctx,
+			`Eres un asesor de ventas amable y natural. El usuario es de ${ciudad}, donde NO tenemos cobertura directa pero podemos enviar por Coordinadora (el flete se cobra al hacer el pedido). Redacta un mensaje personalizado (máximo 2 oraciones) que:
+- NO diga "qué bien" ni "excelente" (porque no hay cobertura directa)
+- Informe amablemente que no tenemos cobertura directa pero que enviamos por Coordinadora (flete por pagar)
+- Pregunte qué producto o referencia busca
+- Use un tono natural, no robotizado
+NO incluyas saludos formales, solo el cuerpo del mensaje.`
+		);
+	} catch {
+		return `En ${ciudad.charAt(0).toUpperCase() + ciudad.slice(1)} no tenemos cobertura directa, pero podemos enviarte por Coordinadora (el flete se cobra al hacer el pedido). ¿Qué producto o referencia buscas?`;
+	}
+}
+
 export class VentasAgent implements IAgent {
 	name = 'Ventas';
 
@@ -249,8 +268,7 @@ export class VentasAgent implements IAgent {
 					}));
 					const listStr = matchedProducts
 						.map((p, i) => {
-							const precio = p.price ? `$${Number(p.price).toLocaleString('es-CO')}` : 'Consultar';
-							return `${i + 1}️⃣ *${p.name}* - ${precio}`;
+							return `${i + 1}️⃣ *${p.name}*`;
 						})
 						.join('\n');
 					
@@ -513,8 +531,9 @@ export class VentasAgent implements IAgent {
 				};
 			}
 
+			const msgSinCobertura = (await generarMensajeSinCobertura(ciudadCap, context?.pendingMessage || '')).trim();
 			return {
-				response: `${getSaludo()} ¡Qué bien! En ${ciudadCap} no tenemos cobertura directa, el envío sería por Coordinadora (el flete se cobra al hacer el pedido).\n\nCuéntame, ¿qué producto o referencia buscas? 😊`,
+				response: msgSinCobertura,
 				metadata: {
 					agentType: 'ventas',
 					ciudad: ciudadDetectada,
@@ -620,8 +639,9 @@ export class VentasAgent implements IAgent {
 				ciudad: ciudadDetectada,
 				tieneCobertura: false,
 			};
+			const msgSinCobertura = (await generarMensajeSinCobertura(ciudadDetectada, context?.pendingMessage || '')).trim();
 			return {
-				response: `${getSaludo()} En ${ciudadDetectada} no tenemos cobertura directa, el envío sería por Coordinadora (el flete se cobra al hacer el pedido).\n\nCuéntame, ¿qué producto o referencia buscas? 😊`,
+				response: msgSinCobertura,
 				metadata: {
 					agentType: 'ventas',
 					ciudad: ciudadDetectada,
