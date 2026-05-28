@@ -483,6 +483,23 @@ export class VentasAgent implements IAgent {
 			const ciudadCap = ciudadDetectada.charAt(0).toUpperCase() + ciudadDetectada.slice(1);
 
 			if (cobertura === 'cobertura') {
+				const msgOriginal = context?.pendingMessage || '';
+				const yaDijoCredito = /\b(?:cr[eé]dito|financiar|cuotas|a cuotas|financiaci[oó]n)\b/i.test(msgOriginal);
+				if (yaDijoCredito) {
+					return {
+						response: `¡Qué bien! A ${ciudadCap} te llega con envío gratis 🚚\n\n¡Dale, te ayudo con el crédito! 📋 Para armar tu solicitud necesito algunos datos. Empecemos con lo básico:\n\n¿Cómo te llamas? (nombre completo)`,
+						metadata: {
+							agentType: 'ventas',
+							ciudad: ciudadDetectada,
+							ciudadValidada: true,
+							tieneCobertura: true,
+							flujo: 'credito',
+							modalidad: 'credito',
+							creditoData: {},
+							creditoStep: 1,
+						},
+					};
+				}
 				return {
 					response: `¡Qué bien! A ${ciudadCap} te llega con envío gratis 🚚\n\n¿La compra sería al *contado* o a *crédito*?`,
 					metadata: {
