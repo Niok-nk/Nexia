@@ -401,6 +401,7 @@ export async function processIncomingMessage(
 
 		const repuesto = metadata?.repuestoData;
 		if (repuesto?.nombreCliente) ud.nombre = repuesto.nombreCliente;
+		if (repuesto?.cedulaCliente) ud.cedula = repuesto.cedulaCliente;
 		if (repuesto?.repuesto) ud.productoSolicitado = repuesto.repuesto;
 
 		if (metadata?.productoCompra) ud.productoSolicitado = metadata.productoCompra;
