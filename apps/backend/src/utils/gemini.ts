@@ -49,7 +49,7 @@ function esRespuestaSegura(texto: string): boolean {
 	const palabras = texto.toLowerCase().replace(/[.,!?¡¿()\-"]/g, '').split(/\s+/).filter(Boolean);
 	if (palabras.length > 0) {
 		const ingles = palabras.filter(p => PALABRAS_INGLES_COMUNES.has(p)).length;
-		if (ingles / palabras.length > 0.15) {
+		if (ingles / palabras.length > 0.35) {
 			return false;
 		}
 	}
@@ -75,7 +75,7 @@ export const generateResponse = async (
 
 	for (const modelName of MODELS) {
 		let currentPrompt = prompt;
-		for (let attempt = 1; attempt <= 3; attempt++) {
+		for (let attempt = 1; attempt <= 5; attempt++) {
 			try {
 			const model = genAI.getGenerativeModel({
 				model: modelName,
@@ -90,7 +90,14 @@ export const generateResponse = async (
 
 				console.warn(`[Gemini API] Model (${modelName}) leaked reasoning or English on attempt ${attempt}. Retrying...`);
 				currentPrompt = `${prompt}\n\n[SISTEMA - ERROR DE SEGURIDAD]: Tu respuesta anterior contenía razonamiento interno o texto en inglés. RESPONDE ÚNICAMENTE EN ESPAÑOL COLOMBIANO. PROHIBIDO escribir en inglés, prohibido mostrar tu razonamiento, análisis o notas de constraints. Escribe solo el mensaje final para el cliente.`;
-			} catch (error) {
+			} catch (error: any) {
+				const esRateLimit = String(error).includes('429') || String(error).includes('Too Many Requests');
+				if (esRateLimit) {
+					const delayMs = Math.min(1000 * Math.pow(2, attempt), 30_000);
+					console.warn(`[Gemini API] Model (${modelName}) rate-limited on attempt ${attempt}. Retrying in ${delayMs}ms...`);
+					await new Promise(r => setTimeout(r, delayMs));
+					continue;
+				}
 				console.warn(`[Gemini API] Model (${modelName}) failed on attempt ${attempt}. Trying next... Error: ${error}`);
 				lastError = error;
 				break; // Romper intentos para probar el siguiente modelo
