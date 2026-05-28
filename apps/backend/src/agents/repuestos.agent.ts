@@ -51,8 +51,8 @@ export class RepuestosAgent implements IAgent {
 
 	// ─────────────────────────── Buscar producto ────────────────────────────
 
-	private async buscarProducto(_message: string, _context: any, repuestoData: any): Promise<AgentResponse> {
-		const query = repuestoData.producto || repuestoData.repuesto || '';
+	private async buscarProducto(message: string, _context: any, repuestoData: any): Promise<AgentResponse> {
+		const query = message.trim() || repuestoData.repuesto || '';
 
 		try {
 			const products = await wooCommerceService.searchProducts(query, 5);
