@@ -98,6 +98,69 @@ export const PROFILING_STEPS: Record<string, ProfilingStep[]> = {
 	],
 };
 
+const NUMEROS_PALABRA: Record<string, number> = {
+	'cero': 0, 'un': 1, 'uno': 1, 'una': 1, 'dos': 2, 'tres': 3, 'cuatro': 4,
+	'cinco': 5, 'seis': 6, 'siete': 7, 'ocho': 8, 'nueve': 9, 'diez': 10,
+	'once': 11, 'doce': 12, 'trece': 13, 'catorce': 14, 'quince': 15,
+	'dieciseis': 16, 'diecisiete': 17, 'dieciocho': 18, 'diecinueve': 19,
+	'veinte': 20, 'treinta': 30, 'cuarenta': 40, 'cincuenta': 50,
+	'sesenta': 60, 'setenta': 70, 'ochenta': 80, 'noventa': 90,
+	'cien': 100, 'cientos': 100, 'ciento': 100, 'doscientos': 200,
+	'trescientos': 300, 'cuatrocientos': 400, 'quinientos': 500,
+	'seiscientos': 600, 'setecientos': 700, 'ochocientos': 800,
+	'novecientos': 900, 'mil': 1000, 'millon': 1_000_000, 'millones': 1_000_000,
+};
+
+function extraerNumero(texto: string): number | null {
+	// 1. Intentar extraer número con dígitos (1.500.000, 1500000, etc)
+	const digito = texto.match(/([\d.,]+)/);
+	if (digito) {
+		const limpio = digito[1].replace(/\./g, '').replace(/,/g, '');
+		const n = parseFloat(limpio);
+		if (!isNaN(n)) return n;
+	}
+
+	// 2. Convertir palabras sueltas (ej: "500" ya capturado arriba)
+	const palabras = texto.toLowerCase().split(/[\s,]+/);
+	const tokens: number[] = [];
+
+	for (const p of palabras) {
+		if (NUMEROS_PALABRA[p] !== undefined) {
+			tokens.push(NUMEROS_PALABRA[p]);
+		}
+	}
+	if (tokens.length === 0) return null;
+
+	// Ej: "un millon quinientos" → [1, 1_000_000, 500]
+	// "dos millones" → [2, 1_000_000]
+	// "trescientos mil" → [300, 1000]
+	let total = 0;
+	let parcial = 0;
+	let tuvoMillon = false;
+
+	for (const t of tokens) {
+		if (t >= 1_000_000) {
+			const multiplo = Math.max(parcial, 1);
+			total += multiplo * t;
+			parcial = 0;
+			tuvoMillon = true;
+		} else if (t === 1000) {
+			parcial = Math.max(parcial, 1) * t;
+			total += parcial;
+			parcial = 0;
+		} else {
+			parcial += t;
+		}
+	}
+	// "un millón quinientos" → coloquialmente 1.500.000 (quinientos = 500.000)
+	if (tuvoMillon && parcial > 0 && parcial < 1000) {
+		parcial *= 1000;
+	}
+	total += parcial;
+
+	return total || null;
+}
+
 export function resolverRespuestaPerfil(msg: string, field: string): string {
 	const lower = msg.toLowerCase().trim();
 
@@ -105,9 +168,8 @@ export function resolverRespuestaPerfil(msg: string, field: string): string {
 		if (/menos|bajo|barato|econ[oó]mico/i.test(lower)) return 'bajo';
 		if (/medio|moderado|normal/i.test(lower)) return 'medio';
 		if (/nevecon|alto|sin l[ií]mite|lo que sea|no importa|ilimitado/i.test(lower)) return 'alto';
-		const numVal = lower.match(/([\d.]+)/);
-		if (numVal) {
-			const valor = parseFloat(numVal[1].replace(/\./g, ''));
+		const valor = extraerNumero(lower);
+		if (valor !== null) {
 			if (valor < 1000000) return 'bajo';
 			if (valor < 2500000) return 'medio';
 			return 'alto';
