@@ -381,6 +381,32 @@ export async function processIncomingMessage(
 			}
 		}
 
+		// ── Notificación de problema con la página web ─────────────────────
+		if (metadata?.notificarProblemaWeb) {
+			const WA_PROBLEMA_WEB = process.env.WA_ESCALAMIENTO || '573187408190';
+			const pd = metadata?.problemaWebData || {};
+			const notaJson = metadata?.notaJson || '{}';
+			const notifMsg = `🌐 REPORTE DE PROBLEMA EN PÁGINA WEB\n\nCliente: ${pd.nombreCliente || 'nombre pendiente'}\nCédula: ${pd.cedulaCliente || 'pendiente'}\nTeléfono: ${phone}\nCiudad: ${pd.ciudad || userData.ciudad || 'No especificada'}\n\nDetalle: ${pd.detalle || 'No especificado'}\nCausa: ${pd.causa || 'No especificada'}\n\nFecha: ${new Date().toLocaleDateString('es-CO')}`;
+			try {
+				const { sendMessage: sendWADirect } = await import('./whatsapp.js');
+				await sendWADirect(WA_PROBLEMA_WEB, notifMsg);
+				logger.info({ phone, tipo: 'problema_web' }, 'Notificación de problema web enviada');
+			} catch (e) {
+				logger.error({ error: e }, 'Error enviando notificación de problema web');
+			}
+			// Crear nota interna en el lead
+			if (lead?.id) {
+				try {
+					await prisma.note.create({
+						data: { leadId: lead.id, body: notaJson },
+					});
+					logger.info({ leadId: lead.id }, 'Nota de problema web creada en lead');
+				} catch (e) {
+					logger.error({ error: e }, 'Error creando nota de problema web');
+				}
+			}
+		}
+
 		if (metadata?.notificarPuntoFisico || metadata?.escalado) {
 			const WA_ESCALAMIENTO = process.env.WA_ESCALAMIENTO || '573187408190';
 			const ciudadInfo = metadata?.ciudad || userData.ciudad || 'ciudad no especificada';

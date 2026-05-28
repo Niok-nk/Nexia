@@ -366,6 +366,37 @@ export class VentasAgent implements IAgent {
 			}
 		}
 
+		// ── Flujo: Problema con la página web ──────────────────────────────────
+		if (context?.flujo === 'problema_web') {
+			const pd = context.problemaWebData || {};
+			const detallesSuficientes = (pd.detalle?.length ?? 0) > 15 || pd.causa;
+			if (detallesSuficientes) {
+				return this.finalizarProblemaWeb(message, context);
+			}
+			return {
+				response: 'Cuéntame más, ¿qué pasó exactamente? ¿Te apareció algún mensaje de error, en qué parte de la página ibas o qué estabas tratando de hacer? Así puedo entender mejor y ayudarte. 😊',
+				metadata: {
+					agentType: 'ventas',
+					flujo: 'problema_web',
+					problemaWebData: pd,
+				},
+			};
+		}
+
+		// Detectar problema web desde mensaje libre (sin flujo activo)
+		const esProblemaWeb = !context?.flujo && /(?:problem[aeo]|error|fall[oóae]|no\s*(?:funcion[ae]|carg[aeo]|abre|sirve|dej[ao]|pued[eo])|pagina\s*(?:no|da|tien)|web\s*(?:no|mal|error)|trab[ae]ad[ao]|congel[ao]|se\s*(?:qued[oó]|trab[oó])|no\s*(?:carg[ao]|proces[oa]|redireccion[ae]|muestra))\b/i.test(lower);
+
+		if (esProblemaWeb) {
+			return {
+				response: '¡Ay no, qué pena que estés teniendo inconvenientes con la página! 😟 Cuéntame, ¿qué estabas haciendo cuando se presentó el problema? ¿Te apareció algún mensaje de error? Así puedo revisar y ayudarte mejor. 💙',
+				metadata: {
+					agentType: 'ventas',
+					flujo: 'problema_web',
+					problemaWebData: { detalle: message },
+				},
+			};
+		}
+
 		// ── Flujo de crédito activo o pausado ──────────────────────────────────
 		if (context?.flujo === 'credito' || context?.flujo === 'credito_pausado') {
 			if (context?.flujo === 'credito_pausado') {
@@ -1415,6 +1446,51 @@ REGLAS DE CATÁLOGO:
 					? { results: products.slice(0, 6), productoIndex, categoria: detectarCategoria(terminoBusqueda) || undefined }
 					: undefined,
 				...datosPersonales,
+			},
+		};
+	}
+
+	// ── Finalizar: Problema con la página web ──────────────────────────────────
+	private async finalizarProblemaWeb(message: string, context: any): Promise<AgentResponse> {
+		const pd = context?.problemaWebData || {};
+		pd.nombreCliente = context?.userData?.nombre || pd.nombreCliente || '';
+		pd.cedulaCliente = context?.userData?.cedula || pd.cedulaCliente || '';
+		pd.ciudad = context?.userData?.ciudad || context?.ciudad || pd.ciudad || '';
+
+		const notaJson = JSON.stringify({
+			tipo: 'PROBLEMA_WEB',
+			fecha: new Date().toISOString(),
+			cliente: pd.nombreCliente,
+			cedula: pd.cedulaCliente,
+			telefono: context?.telefono || '',
+			ciudad: pd.ciudad,
+			detalle: pd.detalle || message,
+			causa: pd.causa || '',
+		});
+
+		const { system, user } = buildGemmaPrompt({
+			instruccion: `Eres Sara, asesora virtual de JLC Electronics Colombia. El cliente reportó un problema con la página web. Datos: ${notaJson}. Instrucción: Responde con un mensaje cálido, empático, en español colombiano femenino. Dile que su reporte ya fue enviado a nuestro equipo especializado y que un asesor se comunicará con él en breve. NO le pidas más datos, NI soluciones técnicas, NI que intente de nuevo. Solo empatía y que será contactado. Usa emojis variados.`,
+			ejemplos: [
+				{
+					cliente: 'No pude pagar, la página no cargó',
+					asistente: '¡Ay, qué pena que hayas tenido ese inconveniente! 😟 Ya quedó registrado tu reporte y nuestro equipo especializado va a revisarlo. En breve un asesor se comunicará contigo para ayudarte. ¡Gracias por avisarnos! 💙🙌',
+				},
+			],
+			historial: formatHistory(context?.history),
+			mensajeCliente: message,
+		});
+
+		const raw = await generateResponse(user, system);
+		const response = cleanResponse(raw);
+
+		return {
+			response,
+			metadata: {
+				agentType: 'ventas',
+				flujo: null,
+				notificarProblemaWeb: true,
+				problemaWebData: pd,
+				notaJson,
 			},
 		};
 	}
