@@ -146,7 +146,7 @@ export class RepuestosAgent implements IAgent {
 
 	private pedirCiudad(repuestoData: any): AgentResponse {
 		return {
-			response: '¿Desde qué ciudad o municipio nos escribes? 📍',
+			response: '¿Desde donde nos escribes? 📍',
 			metadata: { agentType: 'repuestos', flujo: 'repuestos_ciudad', repuestoData },
 		};
 	}
