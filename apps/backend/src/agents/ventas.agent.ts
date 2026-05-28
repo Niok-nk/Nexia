@@ -1140,10 +1140,30 @@ export class VentasAgent implements IAgent {
 				} else {
 					productoIndex = (busquedaGuardada.productoIndex ?? 0) + 1;
 					if (productoIndex >= products.length) {
-						const terminoReSearch = busquedaGuardada.categoria || context?.terminoBusqueda || '';
+						let terminoReSearch = busquedaGuardada.categoria || context?.terminoBusqueda || '';
+						if (!terminoReSearch) {
+							const primerProd = products[0]?.name || '';
+							const catMatch = primerProd.match(/(?:Nevera|Lavadora|Televisor|TV|Congelador|Parlante|Licuadora|Horno|Microondas|Estufa|Ventilador|Aire|Plancha|Aspiradora)/i);
+							if (catMatch) terminoReSearch = catMatch[0].toLowerCase();
+						}
 						if (terminoReSearch) {
-							products = [];
-							terminoBusqueda = terminoReSearch;
+							try {
+								const masProductos = await wooCommerceService.searchProducts(terminoReSearch, 20);
+								if (masProductos?.length > 0) {
+									const idsExistentes = new Set(products.map((p: any) => p.id));
+									const nuevos = masProductos.filter((p: any) => !idsExistentes.has(p.id));
+									if (nuevos.length > 0) {
+										products = [...products, ...nuevos];
+										productoIndex = busquedaGuardada.productoIndex ?? 0;
+									} else {
+										productoIndex = products.length;
+									}
+								} else {
+									productoIndex = products.length;
+								}
+							} catch {
+								productoIndex = products.length;
+							}
 						} else {
 							productoIndex = products.length;
 						}
