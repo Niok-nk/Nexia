@@ -560,8 +560,13 @@ export class VentasAgent implements IAgent {
 			const ciudadDetectada = await extraerCiudadDelMensaje(message);
 
 			if (!ciudadDetectada) {
+				const esPrimeraVez = !context?.history?.length && !context?.nuevaSesion;
+				const saludo = getSaludo();
+				const intro = esPrimeraVez
+					? `${saludo} 👋 Soy ${AGENT_NAME}, tu asesora en JLC Electronics, la marca de los colombianos.\n\n`
+					: '';
 				return {
-					response: `Para poder ayudarte mejor, ¿desde dónde nos escribes? 📍`,
+					response: `${intro}¿Desde dónde nos escribes? 📍`,
 					metadata: {
 						agentType: 'ventas',
 						flujo: 'esperando_ciudad',
