@@ -1,5 +1,6 @@
 import { IAgent, AgentResponse } from './types.js';
 import { getSaludo, AGENT_NAME } from './helpers.js';
+import { generateResponse } from '../utils/gemini.js';
 
 const MENSAJES_RECURRENTE = [
 	(s: string) => `¡${s}! Qué bueno verte de nuevo por aquí. 😊 ¿En qué te puedo ayudar hoy?`,
@@ -60,6 +61,17 @@ function pick<T>(arr: T[]): T {
 	return arr[Math.floor(Math.random() * arr.length)];
 }
 
+async function generarSaludoIA(recurrente: boolean, contexto: string): Promise<string | null> {
+	try {
+		const saludo = getSaludo();
+		const prompt = `Genera un saludo corto y natural (máximo 15 palabras) para un cliente que ${recurrente ? 'vuelve a escribirnos' : 'nos contacta por primera vez'} en JLC Electronics. Clima: ${saludo}. Contexto: ${contexto || 'ninguno'}. Solo el saludo, sin emojis.`;
+		const raw = await generateResponse(prompt, '');
+		const limpio = raw.replace(/["""*]/g, '').trim();
+		if (limpio.length > 10 && limpio.length < 100) return limpio;
+	} catch {}
+	return null;
+}
+
 export class BienvenidaAgent implements IAgent {
 	name = 'Bienvenida';
 
@@ -85,8 +97,9 @@ export class BienvenidaAgent implements IAgent {
 		const tieneIntencion = this.tieneIntencionClara(message);
 
 		if (recurrente && !tieneIntencion) {
+			const iaSaludo = await generarSaludoIA(true, context?.userData?.nombre ? `cliente: ${context.userData.nombre}` : '');
 			return {
-				response: pick(MENSAJES_RECURRENTE)(saludo),
+				response: iaSaludo ? `${iaSaludo} 😊 ¿En qué te puedo ayudar hoy?` : pick(MENSAJES_RECURRENTE)(saludo),
 				metadata: {
 					agentType: 'bienvenida',
 					passthrough: true,
