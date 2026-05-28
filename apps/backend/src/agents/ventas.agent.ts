@@ -860,6 +860,26 @@ export class VentasAgent implements IAgent {
 			};
 		}
 
+		// ── PASO 4e: Ya estamos esperando el comprobante ────────────────────
+		if (context?.flujo === 'esperando_comprobante') {
+			const productoSolicitado = context?.productoSolicitado || context?.userData?.productoSolicitado || 'tu producto';
+			const ciudad = context?.ciudad || context?.userData?.ciudad || '';
+			const tieneCiudad = !!ciudad;
+			const responseParts = [
+				`¡Ay, qué chévere! Ya recibí tu comprobante, así que voy a confirmar el pago de ${productoSolicitado} para dejarla reservada y lista para el envío${tieneCiudad ? ` a ${ciudad}` : ''}. Tan pronto el equipo lo verifique, te estaré contando. ¡Muchas gracias por tu compra! 😊`,
+			];
+			return {
+				response: responseParts.join('\n\n'),
+				metadata: {
+					agentType: 'ventas',
+					flujo: null,
+					ciudad: context?.ciudad,
+					ciudadValidada: true,
+					tieneCobertura: context?.tieneCobertura,
+				},
+			};
+		}
+
 		// ── PASO 5: Flujo de selección de pago ──────────────────────────────
 		if (context?.flujo === 'seleccion_pago') {
 			const opcion = message.trim();
