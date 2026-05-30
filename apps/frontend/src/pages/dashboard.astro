@@ -50,10 +50,7 @@ import Layout from '../layouts/Layout.astro';
 </Layout>
 
 <script>
-  const API = 'http://localhost:8000/api/v1';
-  const token = localStorage.getItem('crm_token') || '';
-
-  const headers = { Authorization: `Bearer ${token}` };
+  const API = window.API || 'http://localhost:8000/api/v1';
 
   function fmtPhone(p: string) {
     return p ? p.replace(/(\d{2})(\d{3})(\d{3})(\d{4})/, '+$1 $2 $3 $4') : '—';
@@ -61,8 +58,13 @@ import Layout from '../layouts/Layout.astro';
 
   function stageLabel(s: string) {
     const m: Record<string, string> = {
-      INITIAL: 'Nuevo', QUALIFIED: 'Calificado', PROPOSAL: 'Propuesta',
-      NEGOTIATION: 'Negociación', WON: 'Ganado', LOST: 'Perdido', ON_HOLD: 'En espera',
+      INITIAL: 'Nuevo',
+      CIUDAD_VALIDADA: 'Ciudad Validada',
+      PRODUCTO_INTERES: 'Interés Producto',
+      CONTACTO_COMPLETO: 'Contacto Completo',
+      PRESUPUESTO_LISTO: 'Presupuesto Listo',
+      VENTA_CERRADA: 'Venta Cerrada',
+      RECHAZADO: 'Rechazado',
     };
     return m[s] || s;
   }
@@ -70,16 +72,16 @@ import Layout from '../layouts/Layout.astro';
   async function loadDashboard() {
     try {
       const [contactsRes, leadsRes] = await Promise.all([
-        fetch(`${API}/contacts?_t=${Date.now()}`, { headers }),
-        fetch(`${API}/leads?_t=${Date.now()}`, { headers }),
+        apiFetch(`${API}/contacts?_t=${Date.now()}`),
+        apiFetch(`${API}/leads?_t=${Date.now()}`),
       ]);
       const contacts = await contactsRes.json();
       const leads = await leadsRes.json();
 
       // Stats
       document.getElementById('stat-contacts')!.textContent = String(contacts.length);
-      document.getElementById('stat-leads')!.textContent = String(leads.filter((l: any) => l.stage !== 'WON' && l.stage !== 'LOST').length);
-      document.getElementById('stat-won')!.textContent = String(leads.filter((l: any) => l.stage === 'WON').length);
+      document.getElementById('stat-leads')!.textContent = String(leads.filter((l: any) => l.stage !== 'VENTA_CERRADA' && l.stage !== 'RECHAZADO').length);
+      document.getElementById('stat-won')!.textContent = String(leads.filter((l: any) => l.stage === 'VENTA_CERRADA').length);
 
       // Messages count (via leads messages)
       const today = new Date().toDateString();
@@ -99,7 +101,7 @@ import Layout from '../layouts/Layout.astro';
             <div style="width:36px;height:36px;border-radius:50%;background:var(--color-wa-glow);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;color:var(--color-wa);">C</div>
             <div>
               <div style="font-weight:600;font-size:0.85rem;">${c.name || 'Sin nombre'}</div>
-              <div class="text-muted font-mono text-xs">${fmtPhone(c.phone)}</div>
+              <div class="text-muted font-mono text-xs">${fmtPhone(c.realPhone || c.phone)}</div>
             </div>
           </a>`).join('')
         : '<div class="text-muted text-sm">Sin contactos aún.</div>';
@@ -112,6 +114,7 @@ import Layout from '../layouts/Layout.astro';
         SERVICIO_TECNICO: 'var(--mod-tecnico)', REPUESTOS: 'var(--mod-repuestos)',
         VACANTES: 'var(--mod-vacantes)', DISTRIBUIDORES: 'var(--mod-distribuidores)',
         MEDIOS_DE_PAGO: 'var(--mod-pagos)',
+        CREDITO: 'var(--mod-credito)',
       };
       const total = leads.length || 1;
       document.getElementById('leads-by-module')!.innerHTML = Object.entries(moduleCount)
@@ -138,7 +141,7 @@ import Layout from '../layouts/Layout.astro';
             ${recentLeads.map((l: any) => `
               <tr>
                 <td>${l.contact?.name || 'Sin nombre'}</td>
-                <td class="font-mono text-xs">${fmtPhone(l.contact?.phone)}</td>
+                <td class="font-mono text-xs">${fmtPhone(l.contact?.realPhone || l.contact?.phone)}</td>
                 <td><span class="badge badge-${l.module}">${l.module?.replace(/_/g,' ')}</span></td>
                 <td><span class="badge badge-${l.stage}">${stageLabel(l.stage)}</span></td>
                 <td class="text-muted text-xs">${new Date(l.createdAt).toLocaleDateString('es-CO')}</td>
@@ -152,4 +155,5 @@ import Layout from '../layouts/Layout.astro';
   }
 
   loadDashboard();
+  setInterval(loadDashboard, 15000);
 </script>

@@ -1,0 +1,74 @@
+{
+  "tienda": "JLC-Electronics",
+  "categorias": [
+    {
+      "nombre": "Audio y Video",
+      "subcategorias": [
+        {
+          "nombre": "Sonido",
+          "url": "https://jlc-electronics.com/product-category/audio-y-video/audio/",
+          "items": [
+            { "nombre": "Cabinas", "url": "https://jlc-electronics.com/product-category/audio-y-video/audio/cabinas" },
+            { "nombre": "Cabinas profesionales", "url": "https://jlc-electronics.com/product-category/audio-y-video/cabinas-profesionales" },
+            { "nombre": "Torres de sonido", "url": "https://jlc-electronics.com/product-category/audio-y-video/torres-de-sonido" },
+            { "nombre": "Parlantes portables", "url": "https://jlc-electronics.com/product-category/audio-y-video/audio/parlantes-portables" }
+          ]
+        },
+        {
+          "nombre": "Video",
+          "url": "https://jlc-electronics.com/product-category/audio-y-video/televisores/",
+          "items": [
+            { "nombre": "Televisores", "url": "https://jlc-electronics.com/product-category/audio-y-video/televisores" },
+            { "nombre": "Bases para Televisores", "url": "https://jlc-electronics.com/nueva-tienda/?yith_wcan=1&product_cat=bases-televisores" }
+          ]
+        }
+      ]
+    },
+    {
+      "nombre": "Hogar",
+      "subcategorias": [
+        {
+          "nombre": "Cocina",
+          "url": "https://jlc-electronics.com/product-category/hogar/electromenores/cocina/",
+          "items": [
+            { "nombre": "Cafeteras", "url": "https://jlc-electronics.com/product-category/hogar/electromenores/cocina/cafeteras" },
+            { "nombre": "Exprimidor", "url": "https://jlc-electronics.com/product-category/hogar/electromenores/cocina/exprimidor-electromenores" },
+            { "nombre": "Freidora", "url": "https://jlc-electronics.com/product-category/hogar/electromenores/cocina/freidora" },
+            { "nombre": "Hervidor", "url": "https://jlc-electronics.com/product-category/hogar/electromenores/cocina/hervidor-cocina" },
+            { "nombre": "Hornos", "url": "https://jlc-electronics.com/product-category/hogar/electromenores/cocina/hornos/" },
+            { "nombre": "Licuadora", "url": "https://jlc-electronics.com/product-category/hogar/electromenores/cocina/licuadora" },
+            { "nombre": "Olla Arrocera", "url": "https://jlc-electronics.com/product-category/hogar/electromenores/cocina/olla-arrocera" },
+            { "nombre": "Olla Presión", "url": "https://jlc-electronics.com/product-category/hogar/electromenores/cocina/olla-presion" }
+          ]
+        },
+        {
+          "nombre": "Climatización",
+          "url": "https://jlc-electronics.com/product-category/hogar/electromenores/ventiladores-electromenores/",
+          "items": [
+            { "nombre": "Ventiladores", "url": "https://jlc-electronics.com/product-category/hogar/electromenores/ventiladores-electromenores/" }
+          ]
+        },
+        {
+          "nombre": "Lavado",
+          "url": "https://jlc-electronics.com/product-category/hogar/lavado/",
+          "items": [
+            { "nombre": "Lavadoras automáticas", "url": "https://jlc-electronics.com/product-category/hogar/lavado/lavadoras" },
+            { "nombre": "Lavadoras semiautomáticas", "url": "https://jlc-electronics.com/product-category/hogar/lavado/lavadoras-semiautomaticas" }
+          ]
+        },
+        {
+          "nombre": "Refrigeración",
+          "url": "https://jlc-electronics.com/product-category/hogar/refrigeracion/",
+          "items": [
+            { "nombre": "Congeladores", "url": "https://jlc-electronics.com/product-category/hogar/refrigeracion/congeladores" },
+            { "nombre": "Exhibidores", "url": "https://jlc-electronics.com/product-category/hogar/refrigeracion/exhibidores" },
+            { "nombre": "Minibar", "url": "https://jlc-electronics.com/product-category/hogar/refrigeracion/minibar" },
+            { "nombre": "Neveras", "url": "https://jlc-electronics.com/product-category/hogar/refrigeracion/neveras" },
+            { "nombre": "Nevecones", "url": "https://jlc-electronics.com/product-category/hogar/refrigeracion/nevecones" },
+            { "nombre": "Vitrinas", "url": "https://jlc-electronics.com/product-category/hogar/refrigeracion/vitrinas-hogar" }
+          ]
+        }
+      ]
+    }
+  ]
+}

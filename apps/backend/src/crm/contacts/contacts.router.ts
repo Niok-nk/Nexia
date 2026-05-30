@@ -1,11 +1,15 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../../db/index.js';
 import { z } from 'zod';
+import { backfillLidMappings } from '../../whatsapp/whatsapp.js';
 
 const router: Router = Router();
 
 router.get('/' as any, async (_req: Request, res: Response) => {
 	try {
+		// Disparar backfill en segundo plano para rellenar realPhone de contactos pendientes
+		backfillLidMappings().catch(() => {});
+
 		const contacts = await prisma.contact.findMany({
 			include: { leads: true, messages: true },
 		});
@@ -22,7 +26,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 	try {
 		const contact = await prisma.contact.findUnique({
 			where: { id: req.params.id as string },
-			include: { leads: true, messages: true },
+			include: { leads: { include: { userData: true } }, messages: true },
 		});
 		if (!contact) {
 			return res.status(404).json({ error: 'Contact not found' });

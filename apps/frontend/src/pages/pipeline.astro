@@ -2,25 +2,38 @@
 import Layout from '../layouts/Layout.astro';
 ---
 <Layout title="Pipeline" subtitle="Leads por etapa del proceso de venta">
-  <div class="kanban-board" id="kanban-board">
-    <div class="text-muted animate-pulse" style="padding:2rem;">Cargando pipeline...</div>
+  <div id="pipeline-container">
+    <div class="module-filter" id="module-filter">
+      <button class="btn btn-primary btn-filter active" data-module="">Todos</button>
+      <button class="btn btn-ghost btn-filter" data-module="VENTAS">Ventas</button>
+      <button class="btn btn-ghost btn-filter" data-module="CREDITO">Crédito</button>
+      <button class="btn btn-ghost btn-filter" data-module="CARTERA">Cartera</button>
+      <button class="btn btn-ghost btn-filter" data-module="SERVICIO_TECNICO">Técnico</button>
+      <button class="btn btn-ghost btn-filter" data-module="REPUESTOS">Repuestos</button>
+      <button class="btn btn-ghost btn-filter" data-module="VACANTES">Vacantes</button>
+      <button class="btn btn-ghost btn-filter" data-module="DISTRIBUIDORES">Distribuidores</button>
+      <button class="btn btn-ghost btn-filter" data-module="MEDIOS_DE_PAGO">Pagos</button>
+    </div>
+    <div class="kanban-board" id="kanban-board">
+      <div class="text-muted animate-pulse" style="padding:2rem;">Cargando pipeline...</div>
+    </div>
   </div>
 </Layout>
 
 <script>
-  const API = 'http://localhost:8000/api/v1';
-  const token = localStorage.getItem('crm_token') || '';
-  const headers = { Authorization: `Bearer ${token}` };
+  const API = window.API || 'http://localhost:8000/api/v1';
 
   const STAGES = [
-    { key: 'INITIAL',     label: 'Nuevos',       color: 'var(--stage-initial)' },
-    { key: 'QUALIFIED',   label: 'Calificados',   color: 'var(--stage-qualified)' },
-    { key: 'PROPOSAL',    label: 'Propuesta',     color: 'var(--stage-proposal)' },
-    { key: 'NEGOTIATION', label: 'Negociación',   color: 'var(--stage-negotiation)' },
-    { key: 'WON',         label: 'Ganados',    color: 'var(--stage-won)' },
-    { key: 'LOST',        label: 'Perdidos',   color: 'var(--stage-lost)' },
-    { key: 'ON_HOLD',     label: 'En espera',  color: 'var(--stage-on-hold)' },
+    { key: 'INITIAL',           label: 'Nuevos',            color: 'var(--stage-initial)' },
+    { key: 'CIUDAD_VALIDADA',   label: 'Ciudad Validada',    color: 'var(--stage-qualified)' },
+    { key: 'PRODUCTO_INTERES',  label: 'Interés Producto',   color: 'var(--stage-proposal)' },
+    { key: 'CONTACTO_COMPLETO', label: 'Contacto Completo',  color: 'var(--stage-negotiation)' },
+    { key: 'PRESUPUESTO_LISTO', label: 'Presupuesto Listo',  color: 'var(--stage-on-hold)' },
+    { key: 'VENTA_CERRADA',     label: 'Venta Cerrada',      color: 'var(--stage-won)' },
+    { key: 'RECHAZADO',         label: 'Rechazados',         color: 'var(--stage-lost)' },
   ];
+
+  let currentModule = '';
 
   function fmtPhone(p: string) {
     return p?.slice(-10) || '—';
@@ -34,37 +47,23 @@ import Layout from '../layouts/Layout.astro';
     return `hace ${Math.floor(h/24)}d`;
   }
 
+  document.getElementById('module-filter')!.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('.btn-filter') as HTMLButtonElement;
+    if (!btn) return;
+    currentModule = btn.dataset.module || '';
+    document.querySelectorAll('.btn-filter').forEach(b => {
+      b.className = b === btn ? 'btn btn-primary btn-filter active' : 'btn btn-ghost btn-filter';
+    });
+    renderPipeline();
+  });
+
+  let allLeads: any[] = [];
+
   async function loadPipeline() {
     try {
-      const res = await fetch(`${API}/leads?_t=${Date.now()}`, { headers });
-      const leads = await res.json();
-      const board = document.getElementById('kanban-board')!;
-
-      board.innerHTML = STAGES.map(stage => {
-        const stageleads = leads.filter((l: any) => l.stage === stage.key);
-        return `
-          <div class="kanban-col">
-            <div class="kanban-col-header">
-              <span class="kanban-col-title" style="color:${stage.color};">${stage.label}</span>
-              <span class="kanban-count">${stageleads.length}</span>
-            </div>
-            <div class="kanban-cards">
-              ${stageleads.length ? stageleads.map((l: any) => `
-                <a href="/contacts/${l.contactId}" style="text-decoration:none;">
-                  <div class="kanban-card">
-                    <div class="kanban-card-name">${l.contact?.name || 'Sin nombre'}</div>
-                    <div class="kanban-card-phone">${fmtPhone(l.contact?.phone)}</div>
-                    <div class="kanban-card-footer">
-                      <span class="badge badge-${l.module}" style="font-size:0.65rem;">${l.module?.replace(/_/g,' ')}</span>
-                      <span class="text-muted text-xs">${timeAgo(l.updatedAt)}</span>
-                    </div>
-                    ${l.notes?.length ? `<div style="margin-top:0.4rem;font-size:0.7rem;color:var(--color-text-muted);">${l.notes.length} nota${l.notes.length > 1 ? 's' : ''}</div>` : ''}
-                  </div>
-                </a>`).join('')
-              : `<div class="text-muted text-xs" style="padding:0.75rem;text-align:center;">Sin leads</div>`}
-            </div>
-          </div>`;
-      }).join('');
+      const res = await apiFetch(`${API}/leads?_t=${Date.now()}`);
+      allLeads = await res.json();
+      renderPipeline();
     } catch (err) {
       console.error('Pipeline error:', err);
       document.getElementById('kanban-board')!.innerHTML =
@@ -72,5 +71,37 @@ import Layout from '../layouts/Layout.astro';
     }
   }
 
+  function renderPipeline() {
+    const filtered = currentModule ? allLeads.filter((l: any) => l.module === currentModule) : allLeads;
+    const board = document.getElementById('kanban-board')!;
+
+    board.innerHTML = STAGES.map(stage => {
+      const stageleads = filtered.filter((l: any) => l.stage === stage.key);
+      return `
+        <div class="kanban-col">
+          <div class="kanban-col-header">
+            <span class="kanban-col-title" style="color:${stage.color};">${stage.label}</span>
+            <span class="kanban-count">${stageleads.length}</span>
+          </div>
+          <div class="kanban-cards">
+            ${stageleads.length ? stageleads.map((l: any) => `
+              <a href="/contacts/${l.contactId}" style="text-decoration:none;">
+                <div class="kanban-card">
+                  <div class="kanban-card-name">${l.contact?.name || 'Sin nombre'}</div>
+                  <div class="kanban-card-phone">${fmtPhone(l.contact?.phone)}</div>
+                  <div class="kanban-card-footer">
+                    <span class="badge badge-${l.module}" style="font-size:0.65rem;">${l.module?.replace(/_/g,' ')}</span>
+                    <span class="text-muted text-xs">${timeAgo(l.updatedAt)}</span>
+                  </div>
+                  ${l.notes?.length ? `<div style="margin-top:0.4rem;font-size:0.7rem;color:var(--color-text-muted);">${l.notes.length} nota${l.notes.length > 1 ? 's' : ''}</div>` : ''}
+                </div>
+              </a>`).join('')
+            : `<div class="text-muted text-xs" style="padding:0.75rem;text-align:center;">Sin leads</div>`}
+          </div>
+        </div>`;
+    }).join('');
+  }
+
   loadPipeline();
+  setInterval(loadPipeline, 15000);
 </script>

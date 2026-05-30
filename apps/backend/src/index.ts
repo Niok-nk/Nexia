@@ -5,6 +5,7 @@ import prisma from './db/index.js';
 import { initWhatsApp } from './whatsapp/whatsapp.js';
 import { validateEnv } from './utils/env.js';
 
+
 validateEnv();
 
 const PORT = process.env.PORT || 8000;
@@ -12,6 +13,7 @@ const PORT = process.env.PORT || 8000;
 const server = app.listen(PORT, () => {
 	logger.info(`Server running on port ${PORT}`);
 	initWhatsApp();
+
 });
 
 process.on('SIGINT', async () => {

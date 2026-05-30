@@ -10,6 +10,7 @@ datasource db {
 model Contact {
   id        String    @id @default(cuid())
   phone     String    @unique
+  realPhone String?
   name      String?
   email     String?
   createdAt DateTime  @default(now())
@@ -19,14 +20,15 @@ model Contact {
 }
 
 model Lead {
-  id         String  @id @default(cuid())
+  id         String    @id @default(cuid())
   contactId  String
-  contact    Contact @relation(fields: [contactId], references: [id])
-  stage      String  @default("INITIAL")
-  type       String  @default("CONSULTA")
-  module     String  @default("VENTAS")
+  contact    Contact   @relation(fields: [contactId], references: [id])
+  stage      String    @default("INITIAL")
+  type       String    @default("CONSULTA")
+  module     String    @default("VENTAS")
   assignedTo String?
   notes      Note[]
+  userData   UserData?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 }
@@ -47,4 +49,21 @@ model Note {
   lead      Lead   @relation(fields: [leadId], references: [id])
   body      String
   createdAt DateTime @default(now())
+}
+
+model UserData {
+  id                String  @id @default(cuid())
+  leadId            String  @unique
+  lead              Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  ciudad            String?
+  departamento      String?
+  nombre            String?
+  cedula            String?
+  productoSolicitado String?
+  presupuesto       String?
+  direccion         String?
+  telefono          String?
+  extra             String  @default("{}")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }

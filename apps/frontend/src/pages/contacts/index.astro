@@ -19,9 +19,7 @@ import Layout from '../../layouts/Layout.astro';
 </Layout>
 
 <script>
-  const API = 'http://localhost:8000/api/v1';
-  const token = localStorage.getItem('crm_token') || '';
-  const headers = { Authorization: `Bearer ${token}` };
+  const API = window.API || 'http://localhost:8000/api/v1';
 
   let allContacts = [];
 
@@ -41,11 +39,16 @@ import Layout from '../../layouts/Layout.astro';
     wrap.innerHTML = `
       <table>
         <thead><tr>
-          <th>Nombre</th><th>Teléfono</th><th>Leads</th><th>Módulo</th><th>Etapa</th><th>Registro</th><th></th>
+          <th>Nombre</th><th>Teléfono</th><th>ID / WhatsApp</th><th>Leads</th><th>Módulo</th><th>Etapa</th><th>Registro</th><th></th>
         </tr></thead>
         <tbody>
           ${contacts.map(c => {
             const lastLead = c.leads?.slice(-1)[0];
+            // Si realPhone existe y es distinto de phone, mostramos ambos.
+            // Si no hay realPhone (LID sin resolver), mostramos phone en columna ID y — en teléfono.
+            const isLidOnly = !c.realPhone;
+            const phoneDisplay = c.realPhone ? fmtPhone(c.realPhone) : '—';
+            const idDisplay = c.phone;
             return `<tr>
               <td>
                 <div style="display:flex;align-items:center;gap:0.5rem;">
@@ -56,7 +59,8 @@ import Layout from '../../layouts/Layout.astro';
                   </div>
                 </div>
               </td>
-              <td class="font-mono text-xs">${fmtPhone(c.phone)}</td>
+              <td class="font-mono text-xs" style="${isLidOnly ? 'color:var(--color-text-muted);font-style:italic;' : ''}">${phoneDisplay}</td>
+              <td class="font-mono text-xs" style="color:var(--color-text-muted);font-size:0.7rem;">${idDisplay}</td>
               <td style="text-align:center;">${c.leads?.length || 0}</td>
               <td>${lastLead ? `<span class="badge badge-${lastLead.module}">${lastLead.module?.replace(/_/g,' ')}</span>` : '<span class="text-muted text-xs">—</span>'}</td>
               <td>${lastLead ? `<span class="badge badge-${lastLead.stage}">${lastLead.stage}</span>` : '<span class="text-muted text-xs">—</span>'}</td>
@@ -70,7 +74,7 @@ import Layout from '../../layouts/Layout.astro';
 
   async function loadContacts() {
     try {
-      const res = await fetch(`${API}/contacts?_t=${Date.now()}`, { headers });
+      const res = await apiFetch(`${API}/contacts?_t=${Date.now()}`);
       allContacts = await res.json();
       renderTable(allContacts);
     } catch {
@@ -82,10 +86,13 @@ import Layout from '../../layouts/Layout.astro';
   document.getElementById('search-input')?.addEventListener('input', (e) => {
     const q = (e.target as HTMLInputElement).value.toLowerCase();
     const filtered = allContacts.filter(c =>
-      (c.name || '').toLowerCase().includes(q) || c.phone.includes(q)
+      (c.name || '').toLowerCase().includes(q) || 
+      c.phone.includes(q) || 
+      (c.realPhone && c.realPhone.includes(q))
     );
     renderTable(filtered);
   });
 
   loadContacts();
+  setInterval(loadContacts, 15000);
 </script>
